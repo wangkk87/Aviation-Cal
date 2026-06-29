@@ -501,35 +501,35 @@ function niceTicks(min,max,n=6){ const span=max-min||1; const step0=span/n; cons
   const t=[]; let v=Math.ceil(min/step)*step; while(v<=max+1e-9){ t.push(M.round(v,6)); v+=step; } return t; }
 /* ----------------------- (3) UI + REGISTRY -------------------------- */
 const CATS = {
-  calc1:{name:'Ch 1 · Functions, Graphs & Limits', color:COL.calc1, n:'01', desc:'Reading a graph: what the height tells you, and what the steepness tells you. The foundation for everything after.',
+  calc1:{name:'Functions, Graphs & Limits', color:COL.calc1, n:'01', desc:'Reading a graph: what the height tells you, and what the steepness tells you. The foundation for everything after.',
     facts:[
       {t:'fact',s:'An altitude-vs-time graph already shows two things at once: how high you are (height) and how fast you’re climbing (steepness).'},
       {t:'use',s:'The vertical speed indicator in the cockpit is literally reading the slope of your altitude graph, live.'},
       {t:'fact',s:'Steeper line = faster climb. Flat = level. Downhill = descent. Reading slope by eye is your first taste of a derivative.'},
       {t:'use',s:'“Limits at infinity” show up as cruise: the climb flattens and altitude levels off toward a ceiling.'}
     ]},
-  deriv:{name:'Ch 2 · Introduction to the Derivative', color:COL.deriv, n:'02', desc:'From average rate of change over a stretch to the exact rate right now — climb rate, speed, and acceleration.',
+  deriv:{name:'The Derivative', color:COL.deriv, n:'02', desc:'From average rate of change over a stretch to the exact rate right now — climb rate, speed, and acceleration.',
     facts:[
       {t:'fact',s:'Average rate of change is rise ÷ run between two points. Shrink the run to zero and you get the derivative — the rate at one instant.'},
       {t:'fact',s:'Your airspeed at one instant is the derivative of distance-down-the-runway. The faster distance piles up, the bigger the number.'},
       {t:'use',s:'Acceleration is the derivative of speed — it’s what pushes you back in the seat on takeoff.'},
       {t:'use',s:'Position → velocity → acceleration is one derivative each: exactly the “straight-line motion” section.'}
     ]},
-  optim:{name:'Ch 4 · Applications of the Derivative', color:COL.optim, n:'04', desc:'Where the derivative is zero, a curve peaks or bottoms out — the math behind best glide and best range.',
+  optim:{name:'Applications of the Derivative', color:COL.optim, n:'04', desc:'Where the derivative is zero, a curve peaks or bottoms out — the math behind best glide and best range.',
     facts:[
       {t:'fact',s:'Every airplane has one “best glide speed” that travels farthest engine-out — it’s the top of a curve, found by setting the derivative to zero.'},
       {t:'use',s:'Max-range and max-endurance airspeeds are different optimization problems — one maximizes distance, the other time aloft.'},
       {t:'fact',s:'At the best-range speed, a small change in airspeed barely changes range — exactly what “slope = 0 at the peak” means.'},
       {t:'use',s:'The first-derivative test tells you whether a flat spot on a curve is a peak (best) or a valley (worst).'}
     ]},
-  integ:{name:'Ch 6–7 · Integrals, Area & Motion', color:COL.calc3, n:'06', desc:'Area under a curve = a total. Distance from speed, fuel burned from fuel flow — adding up tiny slices.',
+  integ:{name:'Integration, Area & Motion', color:COL.calc3, n:'06', desc:'Area under a curve = a total. Distance from speed, fuel burned from fuel flow — adding up tiny slices.',
     facts:[
       {t:'fact',s:'Distance flown is the area under your speed-vs-time graph. Faster or longer → bigger area → farther.'},
       {t:'use',s:'Total fuel burned is the area under the fuel-flow curve — an integral the fuel totalizer computes the whole flight.'},
       {t:'fact',s:'Approximating with rectangles, then letting them get thin, is exactly how the definite integral is built.'},
       {t:'use',s:'Net displacement vs. total distance differ when you double back — the integral handles both, with and without sign.'}
     ]},
-  growth:{name:'Aviation Extras · enrichment', color:COL.calc2, n:'+', desc:'Beyond the chapter list — two aviation favorites that use the same curve-reading skills: the thinning atmosphere and the airplane’s ceiling.',
+  growth:{name:'Aviation Extras', color:COL.calc2, n:'+', desc:'Beyond the chapter list — two aviation favorites that use the same curve-reading skills: the thinning atmosphere and the airplane’s ceiling.',
     facts:[
       {t:'fact',s:'Air pressure drops by about half every ~18,000 ft you climb — which is why high cabins are pressurized.'},
       {t:'use',s:'Thinner air means longer takeoff rolls and weaker climb — the reason “density altitude” matters on a hot, high day.'},
@@ -738,7 +738,7 @@ function polyRealRoots(coeffs){ const n=coeffs.length-1; if(n<1)return []; const
 /* ===================== UNIT 1 · GRAPHS & RATES ===================== */
 
 /* ----- Rate of Climb = Slope ----- */
-add({ id:'rate-of-climb', cat:'deriv', tag:'start here', title:'Rate of Climb = Slope', diff:'intro', ch:'Ch 2.1',
+add({ id:'rate-of-climb', cat:'deriv', tag:'start here', title:'Rate of Climb = Slope', diff:'intro', ch:'Average rate of change',
   questions:['If the airplane climbs the same height in less time, does the line get steeper or flatter?','What are the units of the slope here — height divided by time?','How would level cruise (no altitude change) look on this graph?'],
   blurb:'A climb is just a slope: feet of altitude gained per minute. Move the endpoint and watch rise ÷ run become the rate of climb.',
   build(host){
@@ -772,7 +772,7 @@ add({ id:'rate-of-climb', cat:'deriv', tag:'start here', title:'Rate of Climb = 
 });
 
 /* ----- Read a Flight Profile ----- */
-add({ id:'flight-profile', cat:'calc1', tag:'read a graph', title:'Read a Flight Profile', diff:'intro', ch:'Ch 1.1',
+add({ id:'flight-profile', cat:'calc1', tag:'read a graph', title:'Read a Flight Profile', diff:'intro', ch:'Reading graphs',
   questions:['During cruise the line is flat — what is the rate of climb there?','Where is the slope positive, and where is it negative? What is the airplane doing in each case?','Can two different times share the same altitude but opposite climb rates?'],
   blurb:'Slide along a real climb–cruise–descent profile and read the altitude and the climb rate (the slope) at any moment.',
   build(host){
@@ -808,7 +808,7 @@ add({ id:'flight-profile', cat:'calc1', tag:'read a graph', title:'Read a Flight
 /* ===================== UNIT 2 · THE DERIVATIVE ===================== */
 
 /* ----- Average vs Instant Climb Rate ----- */
-add({ id:'avg-vs-instant', cat:'deriv', tag:'core idea', title:'Average vs. Instant Climb Rate', diff:'intro', ch:'Ch 2.2–2.3',
+add({ id:'avg-vs-instant', cat:'deriv', tag:'core idea', title:'Average vs. Instant Climb Rate', diff:'intro', ch:'The derivative',
   questions:['As the time gap shrinks, what number does the average climb rate close in on?','The cockpit VSI shows the instant rate — which of these two numbers is that?','Early in the climb the curve is steep, later it flattens. What happens to the instant rate?'],
   blurb:'Average climb over a stretch of time vs. the climb rate at one exact instant. Shrink the gap and watch the two values meet — that meeting point is the derivative.',
   build(host){
@@ -844,7 +844,7 @@ add({ id:'avg-vs-instant', cat:'deriv', tag:'core idea', title:'Average vs. Inst
 });
 
 /* ----- Speed = Slope of Distance (takeoff roll) ----- */
-add({ id:'speed-from-distance', cat:'deriv', tag:'takeoff roll', title:'Speed = Slope of Distance', diff:'inter', ch:'Ch 2.4',
+add({ id:'speed-from-distance', cat:'deriv', tag:'takeoff roll', title:'Speed = Slope of Distance', diff:'inter', ch:'Motion',
   questions:['The distance curve gets steeper as the plane speeds up — what does steeper mean for speed?','At the very start, the plane is stopped. What is the slope of the curve there?','How is the instant speed different from the average speed since brake release?'],
   blurb:'On the takeoff roll the plane accelerates, so distance-down-the-runway is a curve. Its slope at any instant is your ground speed.',
   build(host){
@@ -880,7 +880,7 @@ add({ id:'speed-from-distance', cat:'deriv', tag:'takeoff roll', title:'Speed = 
 /* ===================== UNIT 3 · OPTIMIZATION ===================== */
 
 /* ----- Best Glide Speed ----- */
-add({ id:'best-glide', cat:'optim', tag:'find the best', title:'Best Glide Speed', diff:'inter', ch:'Ch 4.5',
+add({ id:'best-glide', cat:'optim', tag:'find the best', title:'Best Glide Speed', diff:'inter', ch:'Optimization',
   questions:['Too slow or too fast and the glide ratio drops — why is there a single best speed in the middle?','At the very top of the curve, what is the slope? (That’s how we find the best speed.)','If you glide from twice the altitude, does the best-glide speed change?'],
   blurb:'Engine out: one airspeed glides you the farthest. It sits at the top of the glide-ratio curve — where the slope is zero.',
   build(host){
@@ -916,7 +916,7 @@ add({ id:'best-glide', cat:'optim', tag:'find the best', title:'Best Glide Speed
 });
 
 /* ----- Best Range Airspeed ----- */
-add({ id:'best-range', cat:'optim', tag:'maximize range', title:'Best Range Airspeed', diff:'inter', ch:'Ch 4.5',
+add({ id:'best-range', cat:'optim', tag:'maximize range', title:'Best Range Airspeed', diff:'inter', ch:'Optimization',
   questions:['Flying faster gets you there sooner — so why doesn’t the fastest speed give the most range?','The best-range speed is the peak of the curve. What is the slope at that peak?','If you carry more fuel, does the best-range speed change, or just the range?'],
   blurb:'With a fixed tank of fuel, one cruise speed flies the farthest. Too fast and fuel flow soars; too slow and you waste gallons just hanging in the air.',
   build(host){
@@ -1023,7 +1023,7 @@ add({ id:'service-ceiling', cat:'growth', tag:'climb limit', title:'Why Airplane
 /* ===================== UNIT 5 · ADDING IT UP (INTEGRATION) ===================== */
 
 /* ----- Distance = Area Under Speed ----- */
-add({ id:'distance-from-speed', cat:'integ', tag:'area = total', title:'Distance = Area Under Speed', diff:'intro', ch:'Ch 6.1',
+add({ id:'distance-from-speed', cat:'integ', tag:'area = total', title:'Distance = Area Under Speed', diff:'intro', ch:'Area = total',
   questions:['Fly twice as long at the same speed — how does the area (distance) change?','With the speed changing, how do thin rectangles help estimate total distance?','As you use more, thinner slices, what happens to the estimate?'],
   blurb:'Your distance flown is the area underneath your speed-vs-time graph. Slice the flight into thin time-strips, add up speed × time for each, and you’ve found the distance.',
   build(host){
@@ -1057,7 +1057,7 @@ add({ id:'distance-from-speed', cat:'integ', tag:'area = total', title:'Distance
 });
 
 /* ----- Fuel Burned = Area Under Fuel Flow ----- */
-add({ id:'fuel-from-flow', cat:'integ', tag:'area = total', title:'Fuel Burned = Area Under Fuel Flow', diff:'inter', ch:'Ch 6.1 · 7.3',
+add({ id:'fuel-from-flow', cat:'integ', tag:'area = total', title:'Fuel Burned = Area Under Fuel Flow', diff:'inter', ch:'Area = total',
   questions:['Climb burns fuel fast; cruise burns less. How does that show up as area?','Gallons-per-hour × hours = what unit? Why does that make the area a fuel total?','Starting with 40 gallons, how do you find what’s left after the flight?'],
   blurb:'Fuel flow changes through a flight — rich in the climb, leaner in cruise. Total fuel burned is the area under the fuel-flow curve over time.',
   build(host){
@@ -1084,6 +1084,251 @@ add({ id:'fuel-from-flow', cat:'integ', tag:'area = total', title:'Fuel Burned =
         ctx.fillStyle=hexA(COL.calc3,.18); ctx.fillRect(x+0.5,y,Math.max(1,w-1),ch.py0-y);
         ctx.strokeStyle=hexA(COL.calc3,.5); ctx.lineWidth=1; ctx.strokeRect(x+0.5,y,Math.max(1,w-1),ch.py0-y); }
       ch.curve(ff,COL.calc3,2.6);
+    }
+    render();
+  }
+});
+
+
+/* =====================================================================
+   TYPE-YOUR-OWN-FUNCTION TOOLS  (limits, derivative, extrema, concavity,
+   curve sketching, integrals)  — students enter f(x) themselves.
+   ===================================================================== */
+
+/* ----- Limit Explorer ----- */
+add({ id:'limit-explorer', cat:'calc1', tag:'type a function', title:'Limit Explorer', diff:'intro', ch:'Limits',
+  questions:['Do the left and right values approach the same number?','Does the limit care about f(a) itself, or only nearby values?','Try sin(x)/x at x = 0 — undefined there, yet the limit exists. Why?'],
+  blurb:'Type any function, pick a point, and watch a table of f(x) values close in on the limit from both sides.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','sin(x)/x',['x'],()=>render(),'try: (x^2-1)/(x-1),  1/x,  sin(x)/x');
+    const aIn=UI.number({label:'Approach x →',value:0,step:'any',onchange:render});
+    const plot=UI.plotCard('Zooming in on x = a',300);
+    const tbl=document.createElement('div'); tbl.className='formula'; tbl.style.lineHeight='1.9';
+    host.appendChild(UI.appGrid([fin,aIn,UI.note('The table shows f(x) as x creeps toward your point from each side. If both columns head to the <b>same</b> number, that number is the <b>limit</b> — even if f(a) itself is undefined.'),tbl],[plot]));
+    plot.enableZoom(render);
+    function sideLimit(f,a,dir){ let v=NaN; for(const o of [1e-1,1e-2,1e-3,1e-4,1e-5,1e-6]){ const y=f(a+dir*o); if(isFinite(y))v=y; } return v; }
+    function render(){
+      const f=fin.fn(); if(!f)return; const a=aIn.get();
+      const offs=[1,0.5,0.1,0.01,0.001];
+      const left=offs.map(o=>({x:a-o,y:f(a-o)})), right=offs.slice().reverse().map(o=>({x:a+o,y:f(a+o)}));
+      let rows='<b>from the left →</b><br>';
+      left.forEach(p=>{ rows+='x = '+M.round(p.x,4)+' → f = '+(isFinite(p.y)?M.round(p.y,5):'undefined')+'<br>'; });
+      rows+='<br><b>← from the right</b><br>';
+      right.forEach(p=>{ rows+='x = '+M.round(p.x,4)+' → f = '+(isFinite(p.y)?M.round(p.y,5):'undefined')+'<br>'; });
+      const fa=f(a); const Lm=sideLimit(f,a,-1), Lp=sideLimit(f,a,1);
+      const exists=isFinite(Lm)&&isFinite(Lp)&&Math.abs(Lp-Lm)<1e-3; const L=(Lp+Lm)/2;
+      rows+='<br>left ≈ '+(isFinite(Lm)?M.round(Lm,5):'—')+',  right ≈ '+(isFinite(Lp)?M.round(Lp,5):'—');
+      rows+='<br>f('+M.round(a,3)+') = '+(isFinite(fa)?M.round(fa,5):'<span style="color:'+COL.coral+'">undefined</span>');
+      if(exists){ rows+='<br><b style="color:'+COL.calc1+'">limit = '+M.round(L,5)+'</b>'; if(!isFinite(fa)||Math.abs(fa-L)>1e-3) rows+=' <span style="color:'+COL.amber+'">(hole: f(a) ≠ limit)</span>'; }
+      else rows+='<br><b style="color:'+COL.coral+'">left ≠ right → no limit</b>';
+      tbl.innerHTML=rows;
+      const span=2; const ch=plot.chart(); ch.setX(a-span,a+span);
+      const ys=[]; for(let i=0;i<=80;i++){ const x=a-span+2*span*i/80; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e4)ys.push(y); }
+      let ylo=ys.length?M.min(ys):-2, yhi=ys.length?M.max(ys):2; if(exists){ylo=Math.min(ylo,L);yhi=Math.max(yhi,L);} const pad=(yhi-ylo)*0.15||1;
+      ch.setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,5),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
+      ch.axisX(niceTicks(ch.xmin,ch.xmax,5)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      ch.curve(f,COL.calc1,2.4); ch.vline(a,hexA(COL.coral,.6),1.5,[4,3]);
+      if(exists){ const ctx=ch.ctx; ctx.beginPath(); ctx.arc(ch.X(a),ch.Y(L),5,0,M.TAU); ctx.fillStyle=COL.paper; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=COL.coral; ctx.stroke(); }
+    }
+    render();
+  }
+});
+
+/* ----- Limits at Infinity & Horizontal Asymptotes ----- */
+add({ id:'limits-at-infinity', cat:'calc1', tag:'type a function', title:'Limits at Infinity & Asymptotes', diff:'inter', ch:'Limits at infinity',
+  questions:['As x grows huge, does f(x) settle toward a single number?','A horizontal asymptote is that settling value — does your function have one to the right? To the left?','Try (3x+1)/(x−2): what value does it level off at, and why?'],
+  blurb:'Type a function and push x toward +∞ and −∞. If the values settle, you have found a horizontal asymptote.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','(3*x+1)/(x-2)',['x'],()=>render(),'try: (3x+1)/(x-2),  1/x,  x/sqrt(x^2+1)');
+    const tbl=document.createElement('div'); tbl.className='formula'; tbl.style.lineHeight='2';
+    const plot=UI.plotCard('f(x) over a wide range',320);
+    host.appendChild(UI.appGrid([fin,UI.note('Plug in bigger and bigger x. If f(x) homes in on a number L, the line <b>y = L</b> is a <b>horizontal asymptote</b> — the curve hugs it but may never touch. The left and right ends can settle to different values.'),tbl],[plot]));
+    plot.enableZoom(render);
+    function settle(f,sign){ const xs=[10,100,1000,1e4,1e5]; let v=NaN; xs.forEach(x=>{ const y=f(sign*x); if(isFinite(y))v=y; }); return v; }
+    function render(){
+      const f=fin.fn(); if(!f)return;
+      const Lp=settle(f,1), Lm=settle(f,-1);
+      let rows='<b>x → +∞</b><br>';
+      [10,100,1000,10000].forEach(x=>{ const y=f(x); rows+='x = '+x.toLocaleString()+' → f = '+(isFinite(y)?M.round(y,4):'—')+'<br>'; });
+      rows+='<br><b>x → −∞</b><br>';
+      [-10,-100,-1000,-10000].forEach(x=>{ const y=f(x); rows+='x = '+x.toLocaleString()+' → f = '+(isFinite(y)?M.round(y,4):'—')+'<br>'; });
+      rows+='<br><b style="color:'+COL.calc1+'">right: '+(isFinite(Lp)?'y → '+M.round(Lp,4):'grows without bound')+'</b>';
+      rows+='<br><b style="color:'+COL.calc2+'">left: '+(isFinite(Lm)?'y → '+M.round(Lm,4):'grows without bound')+'</b>';
+      tbl.innerHTML=rows;
+      const ch=plot.chart(); ch.setX(-50,50);
+      const ys=[]; for(let i=0;i<=120;i++){ const x=-50+100*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e4)ys.push(y); }
+      let ylo=ys.length?M.min(ys):-5, yhi=ys.length?M.max(ys):5; const pad=(yhi-ylo)*0.15||1;
+      ch.setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(-50,50,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
+      ch.axisX(niceTicks(-50,50,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      if(isFinite(Lp)) ch.line(0,Lp,50,Lp,hexA(COL.calc1,.5),1.8,[6,4]);
+      if(isFinite(Lm)) ch.line(-50,Lm,0,Lm,hexA(COL.calc2,.5),1.8,[6,4]);
+      ch.curve(f,COL.optim,2.4);
+    }
+    render();
+  }
+});
+
+/* ----- Graph of the Derivative ----- */
+add({ id:'derivative-grapher', cat:'deriv', tag:'type a function', title:'Graph of the Derivative', diff:'inter', ch:'Slope graph',
+  questions:['Where the top curve is flat (a peak or valley), what does the slope graph do?','Where the top curve goes uphill, is the slope graph above or below zero?','Can you predict the shape of f′ before you look?'],
+  blurb:'Type a function on top; the bottom graph draws its slope at every point — the derivative f′(x). Watch peaks turn into zeros.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  sin(x),  x^2');
+    const px=UI.slider({label:'Point x',min:-5,max:5,step:.1,value:1,fmt:v=>v.toFixed(1),oninput:render});
+    const stats=UI.statsBox();
+    const top=UI.plotCard('f(x)',230), bot=UI.plotCard('slope of f  =  f′(x)',230);
+    host.appendChild(UI.appGrid([fin,px,stats,UI.note('The bottom graph plots the <b>slope</b> of the top graph at each x. A flat spot up top → the slope graph crosses <b>zero</b>. Uphill → slope positive (above the axis). Downhill → slope negative.')],[top,bot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const x0=px.get(); const fp=x=>M.nderiv(f,x);
+      stats.set([{k:'f(x)',v:M.round(f(x0),3)},{k:'slope f′(x)',v:M.round(fp(x0),3),accent:true}]);
+      let ys=[]; for(let i=0;i<=120;i++){ const x=-5+10*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let lo=ys.length?M.min(ys):-3,hi=ys.length?M.max(ys):3,pad=(hi-lo)*.15||1;
+      let c=top.chart(); c.setX(-5,5).setY(lo-pad,hi+pad); c.clear(); c.gridlines(niceTicks(-5,5,6),niceTicks(c.ymin,c.ymax,5)); c.axes(); c.axisX(niceTicks(-5,5,6)); c.axisY(niceTicks(c.ymin,c.ymax,5)); c.curve(f,COL.calc1,2.4);
+      const m=fp(x0),b=f(x0); c.line(-5,m*(-5-x0)+b,5,m*(5-x0)+b,hexA(COL.deriv,.5),1.8,[6,4]); c.vline(x0,hexA(COL.optim,.5),1.5,[4,3]); c.dot(x0,b,COL.optim,5);
+      let ys2=[]; for(let i=0;i<=120;i++){ const x=-5+10*i/120; const y=fp(x); if(isFinite(y)&&Math.abs(y)<1e3)ys2.push(y);} let lo2=ys2.length?M.min(ys2):-3,hi2=ys2.length?M.max(ys2):3,pad2=(hi2-lo2)*.15||1;
+      let d=bot.chart(); d.setX(-5,5).setY(lo2-pad2,hi2+pad2); d.clear(); d.gridlines(niceTicks(-5,5,6),niceTicks(d.ymin,d.ymax,5)); d.axes(); d.axisX(niceTicks(-5,5,6)); d.axisY(niceTicks(d.ymin,d.ymax,5)); d.curve(fp,COL.deriv,2.4); d.vline(x0,hexA(COL.optim,.5),1.5,[4,3]); d.dot(x0,fp(x0),COL.optim,5);
+    }
+    render();
+  }
+});
+
+/* ----- Tangent Line & the Slope (with the derivative formula) ----- */
+add({ id:'tangent-line', cat:'deriv', tag:'type a function', title:'Tangent Line & the Slope', diff:'intro', ch:'Tangent line',
+  questions:['The tangent line just touches the curve at your point — what does its steepness equal?','Slide the point through a peak: what is the slope exactly at the top?','Type a power like x^4 — does the slope match the power rule you would get by hand?'],
+  blurb:'Type a function, slide to any point, and see the tangent line and its slope. The slope there is the derivative — and the exact formula is shown when it can.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','x^2',['x'],()=>render(),'try: x^2,  x^3,  sin(x),  exp(x)');
+    const aIn=UI.slider({label:'Point a',min:-5,max:5,step:.1,value:1.5,fmt:v=>v.toFixed(1),oninput:render});
+    const stats=UI.statsBox(); const sym=UI.formula('');
+    const plot=UI.plotCard('f(x) with the tangent line at a',360);
+    host.appendChild(UI.appGrid([fin,aIn,stats,sym,UI.note('The <b>tangent line</b> grazes the curve at x = a. Its <b>slope</b> is the derivative f′(a). For standard functions the exact derivative formula appears too — compare it with the slope you read off.')],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const a=aIn.get();
+      const slope=M.nderiv(f,a), fa=f(a);
+      stats.set([{k:'f(a)',v:M.round(fa,3)},{k:'slope f′(a)',v:M.round(slope,3),accent:true}]);
+      try{ const t=Sym.parse(fin.get(),['x']); const d=Sym.simp(Sym.diff(t)); sym.set('f′(x) = '+Sym.str(d)); }catch(e){ sym.set('f′(x): type a standard function to see the formula'); }
+      let ys=[]; for(let i=0;i<=120;i++){ const x=-5+10*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let lo=ys.length?M.min(ys):-3,hi=ys.length?M.max(ys):3,pad=(hi-lo)*.15||1;
+      const ch=plot.chart(); ch.setX(-5,5).setY(lo-pad,hi+pad); ch.clear(); ch.gridlines(niceTicks(-5,5,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(-5,5,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      ch.curve(f,COL.calc1,2.4); ch.line(-5,slope*(-5-a)+fa,5,slope*(5-a)+fa,COL.optim,2.4); ch.dot(a,fa,COL.ink,5);
+    }
+    render();
+  }
+});
+
+/* ----- Local Max & Min (First Derivative Test) ----- */
+add({ id:'first-derivative-test', cat:'optim', tag:'type a function', title:'Local Max & Min — First Derivative Test', diff:'inter', ch:'First-derivative test',
+  questions:['At a local max the slope goes from + to − — what is the slope exactly at the top?','Where the function is increasing, is the slope positive or negative?','How can a flat spot (slope = 0) be neither a max nor a min?'],
+  blurb:'Type a function. The tool finds the flat spots (slope = 0), then uses the sign of the slope on each side to label each as a local max or a local min.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  x^4-2x^2,  sin(x)');
+    const info=document.createElement('div'); info.className='formula'; info.style.lineHeight='1.9';
+    const plot=UI.plotCard('f(x): rising in green, falling in red',360);
+    host.appendChild(UI.appGrid([fin,UI.note('Green = <b>increasing</b> (slope +). Red = <b>decreasing</b> (slope −). Where it switches green→red is a <b>local max</b>; red→green is a <b>local min</b>. That switch is the first-derivative test.'),info],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x);
+      const lo=-5,hi=5,N=600,h=(hi-lo)/N;
+      const crit=[]; let prev=fp(lo);
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)&&prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m; } const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } prev=cur; }
+      let rows = crit.length? '' : 'No local max/min in [−5, 5] for this function.<br>';
+      crit.forEach(c=>{ rows+='<b style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>'; });
+      info.innerHTML=rows;
+      let ys=[]; for(let i=0;i<=120;i++){ const x=lo+(hi-lo)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let ylo=ys.length?M.min(ys):-3,yhi=ys.length?M.max(ys):3,pad=(yhi-ylo)*.15||1;
+      const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(lo,hi,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(lo,hi,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      const ctx=ch.ctx; let pX=null,pY=null;
+      for(let i=0;i<=N;i++){ const x=lo+i*h, y=f(x); if(!isFinite(y)){pX=null;continue;} const yc=M.clamp(y,ch.ymin-50,ch.ymax+50); const up=fp(x)>=0;
+        if(pX!==null){ ctx.strokeStyle=up?COL.calc2:COL.coral; ctx.lineWidth=2.7; ctx.beginPath(); ctx.moveTo(ch.X(pX),ch.Y(pY)); ctx.lineTo(ch.X(x),ch.Y(yc)); ctx.stroke(); } pX=x; pY=yc; }
+      crit.forEach(c=>ch.dot(c.x,c.y,c.kind==='max'?COL.optim:COL.calc2,6));
+    }
+    render();
+  }
+});
+
+/* ----- Concavity & Inflection Points ----- */
+add({ id:'concavity', cat:'optim', tag:'type a function', title:'Concavity & Inflection Points', diff:'inter', ch:'Concavity',
+  questions:['“Concave up” holds water like a cup; “concave down” spills like a dome. Which way is your curve bending?','An inflection point is where it switches — what does the second derivative do there?','Can a curve be increasing the whole time yet still change concavity?'],
+  blurb:'Type a function. The tool shades where the curve is concave up vs concave down and marks the inflection points where it switches.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  x^4-6x^2,  sin(x)');
+    const info=document.createElement('div'); info.className='formula'; info.style.lineHeight='1.9';
+    const plot=UI.plotCard('blue = concave up · orange = concave down',360);
+    host.appendChild(UI.appGrid([fin,UI.note('Concavity comes from the <b>second derivative</b>. Where it is positive the curve is <b>concave up</b> (a cup); where negative it is <b>concave down</b> (a dome). The switch points are <b>inflection points</b>.'),info],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const f2=x=>M.nderiv2(f,x);
+      const lo=-5,hi=5,N=600,h=(hi-lo)/N;
+      const infl=[]; let prev=f2(lo);
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(prev)&&isFinite(cur)&&prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m; } const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } prev=cur; }
+      let rows= infl.length? '' : 'No inflection points in [−5, 5] for this function.<br>';
+      infl.forEach(c=>{ rows+='<b style="color:'+COL.calc3+'">inflection</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>'; });
+      info.innerHTML=rows;
+      let ys=[]; for(let i=0;i<=120;i++){ const x=lo+(hi-lo)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let ylo=ys.length?M.min(ys):-3,yhi=ys.length?M.max(ys):3,pad=(yhi-ylo)*.15||1;
+      const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(lo,hi,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(lo,hi,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      const ctx=ch.ctx; let pX=null,pY=null;
+      for(let i=0;i<=N;i++){ const x=lo+i*h, y=f(x); if(!isFinite(y)){pX=null;continue;} const yc=M.clamp(y,ch.ymin-50,ch.ymax+50); const up=f2(x)>=0;
+        if(pX!==null){ ctx.strokeStyle=up?COL.calc1:COL.optim; ctx.lineWidth=2.7; ctx.beginPath(); ctx.moveTo(ch.X(pX),ch.Y(pY)); ctx.lineTo(ch.X(x),ch.Y(yc)); ctx.stroke(); } pX=x; pY=yc; }
+      infl.forEach(c=>ch.dot(c.x,c.y,COL.calc3,6));
+    }
+    render();
+  }
+});
+
+/* ----- Curve Sketcher (everything at once) ----- */
+add({ id:'curve-sketcher', cat:'optim', tag:'type a function', title:'Curve Sketcher — all the clues', diff:'adv', ch:'Curve sketching',
+  questions:['Where are the peaks and valleys, and where does the bend switch?','Do the rising/falling colors agree with where the peaks and valleys sit?','Could you reproduce this sketch by hand from f′ and f″ alone?'],
+  blurb:'Type a function and get the whole picture: rising/falling coloring, local max/min dots, inflection points, plus optional f′ and f″ overlays — everything curve sketching asks for.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  x^4-2x^2,  x/(1+x^2)');
+    const showD1=UI.seg({label:'Show slope f′(x)?',options:[{label:'Hide',value:'0'},{label:'Show',value:'1'}],value:'0',onchange:render});
+    const showD2=UI.seg({label:'Show bend f″(x)?',options:[{label:'Hide',value:'0'},{label:'Show',value:'1'}],value:'0',onchange:render});
+    const info=document.createElement('div'); info.className='formula'; info.style.lineHeight='1.8';
+    const plot=UI.plotCard('full sketch — green up · red down · purple = inflection',380);
+    host.appendChild(UI.appGrid([fin,showD1,showD2,UI.note('Green/red = increasing/decreasing (from the slope). Orange dot = local max, teal dot = local min. Purple dot = inflection point (from the bend). Flip on the f′ and f″ overlays to see the clues behind the sketch.'),info],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x), f2=x=>M.nderiv2(f,x);
+      const lo=-5,hi=5,N=600,h=(hi-lo)/N;
+      const crit=[]; let prev=fp(lo);
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)&&prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m;} const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } prev=cur; }
+      const infl=[]; let p2=f2(lo);
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(p2)&&isFinite(cur)&&p2*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m;} const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } p2=cur; }
+      let rows='';
+      rows += crit.length ? crit.map(c=>'<span style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ')+'<br>' : 'no local max/min in view<br>';
+      rows += infl.length ? infl.map(c=>'<span style="color:'+COL.calc3+'">inflection</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ') : 'no inflection points in view';
+      info.innerHTML=rows;
+      let ys=[]; for(let i=0;i<=120;i++){ const x=lo+(hi-lo)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let ylo=ys.length?M.min(ys):-3,yhi=ys.length?M.max(ys):3,pad=(yhi-ylo)*.18||1;
+      const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(lo,hi,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(lo,hi,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      if(showD1.get()==='1') ch.curve(fp,hexA(COL.deriv,.6),1.6);
+      if(showD2.get()==='1') ch.curve(f2,hexA(COL.amber,.75),1.6);
+      const ctx=ch.ctx; let pX=null,pY=null;
+      for(let i=0;i<=N;i++){ const x=lo+i*h, y=f(x); if(!isFinite(y)){pX=null;continue;} const yc=M.clamp(y,ch.ymin-50,ch.ymax+50); const up=fp(x)>=0;
+        if(pX!==null){ ctx.strokeStyle=up?COL.calc2:COL.coral; ctx.lineWidth=2.9; ctx.beginPath(); ctx.moveTo(ch.X(pX),ch.Y(pY)); ctx.lineTo(ch.X(x),ch.Y(yc)); ctx.stroke(); } pX=x; pY=yc; }
+      crit.forEach(c=>ch.dot(c.x,c.y,c.kind==='max'?COL.optim:COL.calc2,6));
+      infl.forEach(c=>ch.dot(c.x,c.y,COL.calc3,5));
+    }
+    render();
+  }
+});
+
+/* ----- Definite Integral & Signed Area ----- */
+add({ id:'definite-integral', cat:'integ', tag:'type a function', title:'Definite Integral & Signed Area', diff:'inter', ch:'Definite integral',
+  questions:['Area above the axis counts as positive; below counts as negative. How do they combine?','Slide b to the right: how does the running total change as area piles up?','For f(x) = x on [−2, 2], why is the total zero?'],
+  blurb:'Type a function and choose limits a and b. See the signed area shaded, its value, and the running-total curve that the Fundamental Theorem ties back to f.',
+  build(host){
+    const fin=makeFnInput('Integrand f(x)','sin(x)',['x'],()=>render(),'try: sin(x),  x^2,  x,  1/x');
+    const aIn=UI.number({label:'lower limit a',value:0,step:'any',onchange:render});
+    const bIn=UI.number({label:'upper limit b',value:3.14159,step:'any',onchange:render});
+    const stats=UI.statsBox();
+    const top=UI.plotCard('f(x) with shaded signed area',250), bot=UI.plotCard('running total  F(x) = area from a to x',230);
+    host.appendChild(UI.appGrid([fin,aIn,bIn,stats,UI.note('<b>Signed area</b>: above the axis adds, below subtracts. The lower graph is the running total F(x). The <b>Fundamental Theorem</b> says its slope is f itself — F′(x) = f(x).')],[top,bot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; let a=aIn.get(), b=bIn.get();
+      const val=M.integrate(f,a,b,500);
+      stats.set([{k:'integral a → b',v:M.round(val,4),accent:true},{k:'interval',v:'['+M.round(a,2)+', '+M.round(b,2)+']'}]);
+      const xlo=Math.min(a,b)-1, xhi=Math.max(a,b)+1;
+      let ys=[]; for(let i=0;i<=120;i++){ const x=xlo+(xhi-xlo)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let ylo=Math.min(0,ys.length?M.min(ys):-1),yhi=Math.max(0,ys.length?M.max(ys):1),pad=(yhi-ylo)*.15||1;
+      const c=top.chart(); c.setX(xlo,xhi).setY(ylo-pad,yhi+pad); c.clear(); c.gridlines(niceTicks(xlo,xhi,6),niceTicks(c.ymin,c.ymax,5)); c.axes(); c.axisX(niceTicks(xlo,xhi,6)); c.axisY(niceTicks(c.ymin,c.ymax,5));
+      const A=Math.min(a,b),B=Math.max(a,b);
+      c.shade(f,A,B,hexA(COL.calc3,.18)); c.curve(f,COL.calc3,2.4); c.vline(a,hexA(COL.optim,.5),1.5,[4,3]); c.vline(b,hexA(COL.optim,.5),1.5,[4,3]);
+      const F=x=>M.integrate(f,a,x,200);
+      let ys2=[]; for(let i=0;i<=60;i++){ const x=xlo+(xhi-xlo)*i/60; const y=F(x); if(isFinite(y)&&Math.abs(y)<1e3)ys2.push(y);} let lo2=ys2.length?M.min(ys2):-1,hi2=ys2.length?M.max(ys2):1,pad2=(hi2-lo2)*.15||1;
+      const d=bot.chart(); d.setX(xlo,xhi).setY(lo2-pad2,hi2+pad2); d.clear(); d.gridlines(niceTicks(xlo,xhi,6),niceTicks(d.ymin,d.ymax,5)); d.axes(); d.axisX(niceTicks(xlo,xhi,6)); d.axisY(niceTicks(d.ymin,d.ymax,5)); d.curve(F,COL.calc1,2.2); d.dot(b,F(b),COL.optim,5);
     }
     render();
   }
@@ -1220,7 +1465,7 @@ function heroAnim(){
   const ch=new Chart(cv,{cssH:300,m:{t:16,r:18,b:30,l:44}});
   const alt=t=>1000 + 9000*(1-Math.exp(-t/6));   // altitude (ft) vs time (min), flattening to cruise
   const a=3;
-  let h=6; const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let h=6; const reduce=(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)||false;
   function frame(){
     ch.setX(0,18).setY(0,11000); ch.clear();
     ch.gridlines(niceTicks(0,18,6),niceTicks(0,11000,5)); ch.axes();
