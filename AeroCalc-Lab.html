@@ -264,7 +264,7 @@ canvas{display:block;}
         <p class="lead">No abstract symbols first — we start with the airplane. Rate of climb, speed on the takeoff roll, best-range airspeed, thinning air at altitude, and fuel burned over a flight. Drag a slider, watch the number change, see why the math matters in the cockpit.</p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="#calc1">Open the tools →</a>
-          <span class="hero-stat"><b id="appletCount">0</b> live tools · plain language</span>
+          <span class="hero-stat"><b id="appletCount">0</b> live tools </span>
         </div>
       </div>
       <div class="hero-canvas-card">
@@ -462,6 +462,8 @@ class Chart{
     const ctx=this.ctx; ctx.strokeStyle=COL.faint; ctx.lineWidth=1.4;
     if(this.ymin<0&&this.ymax>0){ const y=this.Y(0); ctx.beginPath(); ctx.moveTo(this.px0,y); ctx.lineTo(this.px1,y); ctx.stroke(); }
     if(this.xmin<0&&this.xmax>0){ const x=this.X(0); ctx.beginPath(); ctx.moveTo(x,this.py1); ctx.lineTo(x,this.py0); ctx.stroke(); } }
+  clip(){ const ctx=this.ctx; ctx.save(); ctx.beginPath(); ctx.rect(this.px0,this.py1,this.px1-this.px0,this.py0-this.py1); ctx.clip(); }
+  unclip(){ this.ctx.restore(); }
   axisX(ticks,fmt=(v)=>(''+M.round(v,2))){ const ctx=this.ctx; ctx.fillStyle=COL.soft; ctx.font='11px "JetBrains Mono",monospace'; ctx.textAlign='center'; ctx.textBaseline='top';
     ticks.forEach(t=>{ const x=this.X(t); ctx.strokeStyle=COL.line; ctx.beginPath(); ctx.moveTo(x,this.py0); ctx.lineTo(x,this.py0+4); ctx.stroke(); ctx.fillText(fmt(t),x,this.py0+7); }); }
   axisY(ticks,fmt=(v)=>(''+M.round(v,2))){ const ctx=this.ctx; ctx.fillStyle=COL.soft; ctx.font='11px "JetBrains Mono",monospace'; ctx.textAlign='right'; ctx.textBaseline='middle';
@@ -499,6 +501,31 @@ class Chart{
 function niceTicks(min,max,n=6){ const span=max-min||1; const step0=span/n; const mag=Math.pow(10,Math.floor(Math.log10(step0)));
   const norm=step0/mag; let step; if(norm<1.5)step=1; else if(norm<3)step=2; else if(norm<7)step=5; else step=10; step*=mag;
   const t=[]; let v=Math.ceil(min/step)*step; while(v<=max+1e-9){ t.push(M.round(v,6)); v+=step; } return t; }
+/* scan [lo,hi] and return the x that maximizes (or minimizes) f */
+function argExtreme(f,lo,hi,wantMax=true,N=600){ let bx=lo,bv=wantMax?-Infinity:Infinity;
+  for(let i=0;i<=N;i++){ const x=lo+(hi-lo)*i/N, y=f(x); if(!isFinite(y))continue; if(wantMax?y>bv:y<bv){ bv=y; bx=x; } }
+  // local polish around best sample
+  let a=Math.max(lo,bx-(hi-lo)/N), b=Math.min(hi,bx+(hi-lo)/N);
+  for(let k=0;k<40;k++){ const m1=a+(b-a)/3, m2=b-(b-a)/3, y1=f(m1), y2=f(m2);
+    if(wantMax? y1<y2 : y1>y2) a=m1; else b=m2; }
+  return (a+b)/2; }
+/* find vertical asymptotes (poles) of f in [lo,hi] by locating zeros of 1/f */
+function vAsymptotes(f,lo,hi,N=2000){ const g=x=>{ const y=f(x); return isFinite(y)? 1/y : 0; };
+  const res=[]; let pa=lo, pg=g(lo);
+  for(let i=1;i<=N;i++){ const x=lo+(hi-lo)*i/N, gg=g(x);
+    if(isFinite(pg)&&isFinite(gg)&&pg*gg<=0&&!(pg===0&&gg===0)){
+      let a=pa,b=x; for(let k=0;k<60;k++){ const m=(a+b)/2; (g(a)*g(m)<=0)?b=m:a=m; }
+      const xc=(a+b)/2;
+      if(Math.abs(f(xc+1e-4))>1e2||Math.abs(f(xc-1e-4))>1e2){ if(!res.some(u=>Math.abs(u-xc)<(hi-lo)*1e-3)) res.push(xc); }
+    }
+    pa=x; pg=gg; }
+  return res; }
+/* sample f across [lo,hi]; return a padded [ymin,ymax] ignoring blow-ups */
+function autoY(f,lo,hi,{pad=0.15,include=[],cap=1e4,samples=160}={}){
+  const ys=include.filter(isFinite);
+  for(let i=0;i<=samples;i++){ const x=lo+(hi-lo)*i/samples, y=f(x); if(isFinite(y)&&Math.abs(y)<cap)ys.push(y); }
+  let ylo=ys.length?M.min(ys):-1, yhi=ys.length?M.max(ys):1; if(ylo===yhi){ylo-=1;yhi+=1;}
+  const p=(yhi-ylo)*pad||1; return [ylo-p,yhi+p]; }
 /* ----------------------- (3) UI + REGISTRY -------------------------- */
 const CATS = {
   calc1:{name:'Functions, Graphs & Limits', color:COL.calc1, n:'01', desc:'Reading a graph: what the height tells you, and what the steepness tells you. The foundation for everything after.',
@@ -548,8 +575,9 @@ const UI = {
     return g; },
   slider({label,min,max,step=1,value,fmt=(v)=>v,oninput}){ const w=document.createElement('div'); w.className='ctrl';
     w.innerHTML=`<label>${label}<span class="val"></span></label><input type="range" min="${min}" max="${max}" step="${step}" value="${value}">`;
-    const inp=w.querySelector('input'), val=w.querySelector('.val'); const upd=()=>val.textContent=fmt(+inp.value); upd();
-    inp.addEventListener('input',()=>{ upd(); oninput(+inp.value); }); w.get=()=>+inp.value; w.set=(v)=>{inp.value=v;upd();}; w.setFmt=(f)=>{w._f=f;}; return w; },
+    const inp=w.querySelector('input'), val=w.querySelector('.val'); let _fmt=fmt; const upd=()=>val.textContent=_fmt(+inp.value); upd();
+    inp.addEventListener('input',()=>{ upd(); oninput(+inp.value); }); w.get=()=>+inp.value; w.set=(v)=>{inp.value=v;upd();}; w.setFmt=(f)=>{_fmt=f;upd();}; w.input=inp;
+    w.range=(mn,mx,st)=>{ inp.min=mn; inp.max=mx; if(st!=null)inp.step=st; if(+inp.value<mn)inp.value=mn; if(+inp.value>mx)inp.value=mx; upd(); }; return w; },
   text({label,value,hint,onchange,mono=true}){ const w=document.createElement('div'); w.className='ctrl';
     w.innerHTML=`<label>${label}</label><input type="text" value="${value}">${hint?`<span class="hint">${hint}</span>`:''}`;
     const inp=w.querySelector('input'); if(!mono)inp.style.fontFamily='var(--body)';
@@ -751,10 +779,12 @@ add({ id:'rate-of-climb', cat:'deriv', tag:'start here', title:'Rate of Climb = 
     function render(){
       const t2=tEnd.get(), a2=aEnd.get();
       const rise=a2-a1, run=t2-t1, slope=rise/run;
+      const eq='alt = '+a1.toLocaleString()+' + '+Math.round(slope).toLocaleString()+'·t';
       stats.set([
         {k:'Rise · altitude gained',v:rise.toLocaleString()+' ft'},
         {k:'Run · time taken',v:run+' min'},
         {k:'Rate of climb = slope',v:Math.round(slope).toLocaleString()+' ft/min',accent:true},
+        {k:'Line equation',v:eq},
       ]);
       const ch=plot.chart(); ch.setX(0,20).setY(0,12000); ch.clear();
       ch.gridlines(niceTicks(0,20,6),niceTicks(0,12000,6)); ch.axes();
@@ -766,6 +796,13 @@ add({ id:'rate-of-climb', cat:'deriv', tag:'start here', title:'Rate of Climb = 
       const ctx=ch.ctx; ctx.fillStyle=COL.soft; ctx.font='bold 11px "JetBrains Mono",monospace';
       ctx.textAlign='center'; ctx.fillText('run = '+run+' min', ch.X((t1+t2)/2), ch.Y(a1)+16);
       ctx.textAlign='left'; ctx.fillText('rise = '+rise.toLocaleString()+' ft', ch.X(t2)+6, ch.Y((a1+a2)/2));
+      // equation label, parked above the line near its start
+      const lx=t1+run*0.30, ly=a1+slope*(lx-t1);
+      ctx.font='bold 12px "JetBrains Mono",monospace'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+      const tw=ctx.measureText(eq).width, bx=ch.X(lx)+8, by=ch.Y(ly)-26;
+      ctx.fillStyle=hexA(COL.calc1,.10); ctx.fillRect(bx-5,by-13,tw+10,20);
+      ctx.strokeStyle=hexA(COL.calc1,.35); ctx.lineWidth=1; ctx.strokeRect(bx-5,by-13,tw+10,20);
+      ctx.fillStyle=COL.calc1; ctx.fillText(eq,bx,by);
     }
     render();
   }
@@ -776,30 +813,48 @@ add({ id:'flight-profile', cat:'calc1', tag:'read a graph', title:'Read a Flight
   questions:['During cruise the line is flat — what is the rate of climb there?','Where is the slope positive, and where is it negative? What is the airplane doing in each case?','Can two different times share the same altitude but opposite climb rates?'],
   blurb:'Slide along a real climb–cruise–descent profile and read the altitude and the climb rate (the slope) at any moment.',
   build(host){
-    function alt(t){
-      if(t<=10) return 1000 + 800*t;          // climb 800 ft/min
-      if(t<=30) return 9000;                   // cruise
-      if(t<=42) return 9000 - 700*(t-30);      // descent 700 ft/min
-      return 600;
-    }
-    function climbRate(t){ if(t<10)return 800; if(t<30)return 0; if(t<42)return -700; return 0; }
-    const tt=UI.slider({label:'Time into the flight (minutes)',min:0,max:45,step:.5,value:5,fmt:v=>v+' min',oninput:render});
+    // smooth S-ramp so the slope (rate of climb) is continuous and readable everywhere
+    const S=u=> u<=0?0 : u>=1?1 : u*u*(3-2*u);
+    // realistic GA cross-country profile, built from overlapping climb/descent ramps
+    const FIELD=1200;
+    const segs=[
+      {t0:1,  dur:9, dH:6300},   // takeoff + initial climb to ~7,500 ft
+      {t0:22, dur:4, dH:2000},   // step-climb to ~9,500 ft
+      {t0:33, dur:6, dH:-4000},  // descent to ~5,500 ft
+      {t0:42, dur:6, dH:-4200},  // final descent to ~1,300 ft (landing)
+    ];
+    const alt=t=>{ let a=FIELD; segs.forEach(s=>a+=s.dH*S((t-s.t0)/s.dur)); return a; };
+    const climbRate=t=>M.nderiv(alt,t);      // ft/min — literally the slope of the curve
+    const TMAX=49;
+    const tt=UI.slider({label:'Time into the flight (minutes)',min:0,max:TMAX,step:.25,value:5,fmt:v=>v+' min',oninput:render});
+    const play=UI.buttons([{label:'▶ Fly the profile',primary:true,onclick:fly},{label:'⟲ Reset',onclick:()=>{tt.set(0);render();}}]);
     const stats=UI.statsBox();
-    const plot=UI.plotCard('Altitude vs Time — full flight',360);
-    host.appendChild(UI.appGrid([tt,stats,UI.note('The <b>height</b> of the curve is your altitude. The <b>steepness</b> (slope) is your rate of climb: uphill = climbing (+), flat = cruising (0), downhill = descending (−). Same idea as Unit 1 — now on a real flight.')],[plot]));
+    const plot=UI.plotCard('Altitude vs Time — full cross-country',380);
+    host.appendChild(UI.appGrid([tt,play,stats,UI.note('A real flight isn’t one straight climb. This one has a <b>takeoff climb</b>, a <b>cruise</b>, a <b>step-climb</b> to a higher level, a <b>descent</b> with an ATC <b>level-off</b>, then a <b>final descent</b> to landing. The curve’s <b>height</b> is altitude; its <b>steepness</b> is the rate of climb (+ up, 0 level, − down). The orange tangent shows that slope at your moment. Drag the time or press play; scroll to zoom.')],[plot]));
+    plot.enableZoom(render);
+    let raf=null;
+    function fly(){ if(raf)cancelAnimationFrame(raf); let t=0; const step=()=>{ t+=0.35; if(t>=TMAX)t=TMAX; tt.set(t); render(); if(t<TMAX) raf=requestAnimationFrame(()=>setTimeout(step,28)); }; step(); }
+    function phaseName(cr){ return cr>15?'Climbing ↑': cr<-15?'Descending ↓':'Level / cruise →'; }
     function render(){
       const t=tt.get(), a=alt(t), cr=climbRate(t);
-      const ph = cr>5?'Climbing ↑': cr<-5?'Descending ↓':'Level cruise →';
       stats.set([
         {k:'Altitude now',v:Math.round(a).toLocaleString()+' ft'},
-        {k:'Rate of climb = slope',v:(cr>0?'+':'')+cr+' ft/min',accent:true},
-        {k:'Phase of flight',v:ph},
+        {k:'Rate of climb = slope',v:(cr>0?'+':'')+Math.round(cr).toLocaleString()+' ft/min',accent:true},
+        {k:'Phase of flight',v:phaseName(cr)},
       ]);
-      const ch=plot.chart(); ch.setX(0,45).setY(0,11000); ch.clear();
-      ch.gridlines(niceTicks(0,45,6),niceTicks(0,11000,6)); ch.axes();
-      ch.axisX(niceTicks(0,45,6)); ch.axisY(niceTicks(0,11000,6),v=>(v/1000)+'k');
-      ch.curve(alt,COL.calc1,3,320);
-      ch.vline(t,hexA(COL.optim,.6),1.5,[4,3]); ch.dot(t,a,COL.optim,6);
+      const ch=plot.chart(); ch.setX(0,TMAX).setY(0,10800); ch.clear();
+      ch.gridlines(niceTicks(0,TMAX,6),niceTicks(0,10800,6)); ch.axes();
+      ch.axisX(niceTicks(0,TMAX,6),v=>v+'m'); ch.axisY(niceTicks(0,10800,6),v=>(v/1000)+'k');
+      // faint phase shading: green where climbing, orange where descending, grey where level
+      ch.clip();
+      const ctx=ch.ctx, NB=240, hb=TMAX/NB;
+      for(let i=0;i<NB;i++){ const c=climbRate((i+0.5)*hb);
+        ctx.fillStyle=c>15?hexA(COL.calc2,.10):c<-15?hexA(COL.optim,.10):hexA(COL.slate,.06);
+        ctx.fillRect(ch.X(i*hb),ch.py1,ch.X((i+1)*hb)-ch.X(i*hb)+1,ch.py0-ch.py1); }
+      ch.unclip();
+      ch.curve(alt,COL.calc1,3,360);
+      ch.clip(); ch.line(t-4,a+cr*(-4),t+4,a+cr*4,hexA(COL.optim,.85),2); ch.unclip();   // tangent = slope
+      ch.vline(t,hexA(COL.optim,.5),1.5,[4,3]); ch.dot(t,a,COL.optim,6);
     }
     render();
   }
@@ -812,34 +867,44 @@ add({ id:'avg-vs-instant', cat:'deriv', tag:'core idea', title:'Average vs. Inst
   questions:['As the time gap shrinks, what number does the average climb rate close in on?','The cockpit VSI shows the instant rate — which of these two numbers is that?','Early in the climb the curve is steep, later it flattens. What happens to the instant rate?'],
   blurb:'Average climb over a stretch of time vs. the climb rate at one exact instant. Shrink the gap and watch the two values meet — that meeting point is the derivative.',
   build(host){
-    const alt=t=>1000 + 9000*(1-Math.exp(-t/8));   // climbs, flattening toward ~10,000 ft
-    const aT=UI.slider({label:'Pick a moment (minutes)',min:1,max:18,step:.5,value:4,fmt:v=>v+' min',oninput:render});
-    const hT=UI.slider({label:'Time gap (minutes)',min:0.25,max:8,step:.25,value:5,fmt:v=>v+' min',oninput:render});
-    const anim=UI.buttons([{label:'▶ Shrink the gap to zero',primary:true,onclick:run}]);
+    const fin=makeFnInput('Altitude alt(t) — edit me','1000 + 9000*(1-exp(-t/8))',['t'],()=>{syncRanges();render();},'t = minutes;  try: 1000+800*t,  500*t^2/(t+3),  9000*sin(t/6)');
+    const tmin=UI.number({label:'Domain start t',value:0,step:'any',onchange:()=>{syncRanges();render();}});
+    const tmax=UI.number({label:'Domain end t',value:20,step:'any',onchange:()=>{syncRanges();render();}});
+    const aT=UI.slider({label:'Pick a moment (t)',min:1,max:18,step:.1,value:4,fmt:v=>v+'',oninput:render});
+    const hT=UI.slider({label:'Time gap Δt',min:0.1,max:8,step:.1,value:5,fmt:v=>v+'',oninput:render});
+    const anim=UI.buttons([{label:'▶ Shrink the gap to zero',primary:true,onclick:run},{label:'Demo',onclick:()=>{fin.set('1000 + 9000*(1-exp(-t/8))');tmin.set(0);tmax.set(20);syncRanges();render();}}]);
     const stats=UI.statsBox();
-    const plot=UI.plotCard('Altitude curve — average line vs instant line',360);
-    host.appendChild(UI.appGrid([aT,hT,anim,stats,UI.note('<b>Average climb</b> (orange line) = altitude gained ÷ time gap, between the two dots. <b>Instant climb</b> (blue line) = the slope right at your chosen moment — what the VSI reads. As the gap shrinks toward zero, average closes in on instant. That limit <em>is</em> the derivative.')],[plot]));
+    const plot=UI.plotCard('f(t): average secant vs instant tangent',360);
+    host.appendChild(UI.appGrid([fin,tmin,tmax,aT,hT,anim,stats,UI.note('<b>Average rate</b> (orange line) = change in f ÷ Δt, between the two dots. <b>Instant rate</b> (blue dashed) = the slope right at your moment — the derivative. Shrink Δt and watch average close in on instant. Type any altitude function and domain you like.')],[plot]));
+    plot.enableZoom(render);
+    function syncRanges(){ let lo=tmin.get(), hi=tmax.get(); if(!(hi>lo)){hi=lo+1;} const span=hi-lo;
+      aT.range(lo,hi,span/200); if(aT.get()<lo||aT.get()>hi)aT.set(lo+span*0.3);
+      hT.range(span/200,span*0.8,span/200); if(hT.get()>span*0.8)hT.set(span*0.4); if(hT.get()<span/200)hT.set(span*0.4); }
     let raf=null;
-    function run(){ if(raf)cancelAnimationFrame(raf); let h=8;
-      const step=()=>{ h*=0.92; if(h<0.25)h=0.25; hT.set(h); render(); if(h>0.26) raf=requestAnimationFrame(()=>setTimeout(step,40)); }; step(); }
+    function run(){ if(raf)cancelAnimationFrame(raf); const span=Math.max(0.001,tmax.get()-tmin.get()); let h=span*0.4;
+      const step=()=>{ h*=0.9; const hmin=span/200; if(h<hmin)h=hmin; hT.set(h); render(); if(h>hmin*1.02) raf=requestAnimationFrame(()=>setTimeout(step,40)); }; step(); }
     function render(){
-      const a=aT.get(), h=hT.get();
-      const f0=alt(a), f1=alt(a+h);
-      const avg=(f1-f0)/h, inst=M.nderiv(alt,a);
+      const f=fin.fn(); if(!f)return; const lo=tmin.get(); let hi=tmax.get(); if(!(hi>lo))hi=lo+1;
+      const a=M.clamp(aT.get(),lo,hi), h=hT.get();
+      const f0=f(a), f1=f(a+h);
+      const avg=(f1-f0)/h, inst=M.nderiv(f,a);
       stats.set([
-        {k:'Average climb over gap',v:Math.round(avg)+' ft/min'},
-        {k:'Instant climb (VSI)',v:Math.round(inst)+' ft/min',accent:true},
-        {k:'Time gap',v:h+' min'},
+        {k:'Average rate over Δt',v:M.round(avg,2)+''},
+        {k:'Instant rate (derivative)',v:M.round(inst,2)+'',accent:true},
+        {k:'Gap Δt',v:M.round(h,3)+''},
       ]);
-      const ch=plot.chart(); ch.setX(0,20).setY(0,11000); ch.clear();
-      ch.gridlines(niceTicks(0,20,6),niceTicks(0,11000,6)); ch.axes();
-      ch.axisX(niceTicks(0,20,6)); ch.axisY(niceTicks(0,11000,6),v=>(v/1000)+'k');
-      ch.curve(alt,COL.calc1,2.6);
-      ch.line(0,inst*(0-a)+f0, 20, inst*(20-a)+f0, hexA(COL.deriv,.55),2,[6,4]);
-      ch.line(0,avg*(0-a)+f0, 20, avg*(20-a)+f0, COL.optim,2.6);
+      const ch=plot.chart(); ch.setX(lo,hi);
+      const [ylo,yhi]=autoY(f,lo,hi,{include:[f0,f1]}); ch.setY(ylo,yhi); ch.clear();
+      ch.gridlines(niceTicks(lo,hi,6),niceTicks(ch.ymin,ch.ymax,6)); ch.axes();
+      ch.axisX(niceTicks(lo,hi,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,6));
+      ch.curve(f,COL.calc1,2.6);
+      ch.clip();
+      ch.line(lo,inst*(lo-a)+f0, hi, inst*(hi-a)+f0, hexA(COL.deriv,.6),2,[6,4]);
+      ch.line(lo,avg*(lo-a)+f0, hi, avg*(hi-a)+f0, COL.optim,2.6);
+      ch.unclip();
       ch.dot(a,f0,COL.ink,5); ch.dot(a+h,f1,COL.amber,5);
     }
-    render();
+    syncRanges(); render();
   }
 });
 
@@ -849,31 +914,35 @@ add({ id:'speed-from-distance', cat:'deriv', tag:'takeoff roll', title:'Speed = 
   blurb:'On the takeoff roll the plane accelerates, so distance-down-the-runway is a curve. Its slope at any instant is your ground speed.',
   build(host){
     const KT=1.68781; // ft/s per knot
-    const acc=UI.slider({label:'Acceleration · how hard it pulls',min:3,max:12,step:.5,value:7,fmt:v=>v+' ft/s²',oninput:render});
-    const tt=UI.slider({label:'Seconds since brake release',min:1,max:30,step:.5,value:12,fmt:v=>v+' s',oninput:render});
+    const fin=makeFnInput('Distance down runway d(t), feet','0.5*7*t^2',['t'],()=>{syncRanges();render();},'t = seconds;  try: 0.5*7*t^2,  120*t,  3*t^2+5*t');
+    const tmin=UI.number({label:'Domain start t (s)',value:0,step:'any',onchange:()=>{syncRanges();render();}});
+    const tmax=UI.number({label:'Domain end t (s)',value:30,step:'any',onchange:()=>{syncRanges();render();}});
+    const tt=UI.slider({label:'Moment t (seconds)',min:1,max:30,step:.1,value:12,fmt:v=>v+' s',oninput:render});
+    const dmo=UI.buttons([{label:'Demo',onclick:()=>{fin.set('0.5*7*t^2');tmin.set(0);tmax.set(30);syncRanges();render();}}]);
     const stats=UI.statsBox();
     const plot=UI.plotCard('Distance down the runway vs time',360);
-    host.appendChild(UI.appGrid([acc,tt,stats,UI.note('Distance traveled is the <b>curve</b>. Your <b>ground speed</b> is its <b>slope</b> — the tangent line (blue). Because the plane is accelerating, the curve bends upward and the speed keeps rising. A light trainer typically lifts off (“rotates”) near 55 knots.')],[plot]));
+    host.appendChild(UI.appGrid([fin,tmin,tmax,tt,dmo,stats,UI.note('Distance traveled is the <b>curve</b> d(t). Your <b>instant ground speed</b> is its <b>slope</b> — the tangent line (blue). Because the plane is accelerating, the curve bends upward and speed keeps rising; a light trainer lifts off near 55 knots. Edit d(t) and the time window to explore any motion.')],[plot]));
+    plot.enableZoom(render);
+    function syncRanges(){ let lo=tmin.get(),hi=tmax.get(); if(!(hi>lo))hi=lo+1; const span=hi-lo; tt.range(lo+span/100,hi,span/200); if(tt.get()<lo||tt.get()>hi)tt.set(lo+span*0.4); }
     function render(){
-      const a=acc.get(), t=tt.get();
-      const dist=tau=>0.5*a*tau*tau;
-      const d=dist(t);
-      const speedKt=(a*t)/KT, avgKt=(d/t)/KT;
+      const f=fin.fn(); if(!f)return; const lo=tmin.get(); let hi=tmax.get(); if(!(hi>lo))hi=lo+1;
+      const t=M.clamp(tt.get(),lo+1e-6,hi);
+      const d=f(t), slope=M.nderiv(f,t);
+      const denom=(t-lo)||1e-6; const speedKt=slope/KT, avgKt=((d-f(lo))/denom)/KT;
       stats.set([
-        {k:'Distance rolled',v:Math.round(d).toLocaleString()+' ft'},
-        {k:'Instant ground speed',v:Math.round(speedKt)+' kt',accent:true},
+        {k:'Distance d(t)',v:Math.round(d).toLocaleString()+' ft'},
+        {k:'Instant speed = d′(t)',v:Math.round(slope)+' ft/s ('+Math.round(speedKt)+' kt)',accent:true},
         {k:'Average speed so far',v:Math.round(avgKt)+' kt'},
       ]);
-      const top=dist(30);
-      const ch=plot.chart(); ch.setX(0,30).setY(0,top); ch.clear();
-      ch.gridlines(niceTicks(0,30,6),niceTicks(0,top,6)); ch.axes();
-      ch.axisX(niceTicks(0,30,6),v=>v+'s'); ch.axisY(niceTicks(0,top,6),v=>Math.round(v/1000)+'k');
-      ch.curve(dist,COL.calc1,2.8);
-      const slope=a*t;
-      ch.line(0, d+slope*(0-t), 30, d+slope*(30-t), hexA(COL.deriv,.6),2.4);
+      const ch=plot.chart(); ch.setX(lo,hi);
+      const [ylo,yhi]=autoY(f,lo,hi,{include:[0]}); ch.setY(Math.min(0,ylo),yhi); ch.clear();
+      ch.gridlines(niceTicks(lo,hi,6),niceTicks(ch.ymin,ch.ymax,6)); ch.axes();
+      ch.axisX(niceTicks(lo,hi,6),v=>v+'s'); ch.axisY(niceTicks(ch.ymin,ch.ymax,6),v=>Math.abs(v)>=1000?Math.round(v/1000)+'k':Math.round(v));
+      ch.curve(f,COL.calc1,2.8);
+      ch.clip(); ch.line(lo, d+slope*(lo-t), hi, d+slope*(hi-t), hexA(COL.deriv,.6),2.4); ch.unclip();
       ch.dot(t,d,COL.optim,6);
     }
-    render();
+    syncRanges(); render();
   }
 });
 
@@ -884,34 +953,39 @@ add({ id:'best-glide', cat:'optim', tag:'find the best', title:'Best Glide Speed
   questions:['Too slow or too fast and the glide ratio drops — why is there a single best speed in the middle?','At the very top of the curve, what is the slope? (That’s how we find the best speed.)','If you glide from twice the altitude, does the best-glide speed change?'],
   blurb:'Engine out: one airspeed glides you the farthest. It sits at the top of the glide-ratio curve — where the slope is zero.',
   build(host){
-    const k1=17850625, k2=1, C=84500;
-    const G=v=>C/(k1/(v*v)+k2*v*v);            // glide ratio vs airspeed (knots)
-    const vstar=Math.pow(k1/k2,0.25);          // best glide speed ≈ 65 kt
+    const fin=makeFnInput('Glide ratio G(v)','84500/(17850625/v^2 + v^2)',['v'],()=>{syncRanges();render();},'v = knots;  try: 84500/(17850625/v^2+v^2),  12-(v-65)^2/180');
+    const vmin=UI.number({label:'Speed range — min (kt)',value:40,step:'any',onchange:()=>{syncRanges();render();}});
+    const vmax=UI.number({label:'Speed range — max (kt)',value:100,step:'any',onchange:()=>{syncRanges();render();}});
     const v=UI.slider({label:'Your airspeed (knots)',min:40,max:100,step:1,value:50,fmt:x=>x+' kt',oninput:render});
     const alt=UI.slider({label:'Height above ground (feet)',min:1000,max:10000,step:500,value:5000,fmt:x=>x.toLocaleString()+' ft',oninput:render});
-    const find=UI.buttons([{label:'✈ Glide to the best speed',primary:true,onclick:()=>{ v.set(Math.round(vstar)); render(); }}]);
+    const find=UI.buttons([{label:'✈ Glide to the best speed',primary:true,onclick:()=>{ v.set(Math.round(bestSpeed())); render(); }},{label:'Demo',onclick:()=>{fin.set('84500/(17850625/v^2 + v^2)');vmin.set(40);vmax.set(100);syncRanges();render();}}]);
     const stats=UI.statsBox();
     const plot=UI.plotCard('Glide ratio vs airspeed',360);
-    host.appendChild(UI.appGrid([v,alt,find,stats,UI.note('<b>Glide ratio</b> = feet forward per foot down. The curve <b>peaks</b> at the best-glide speed (≈ '+Math.round(vstar)+' kt here). At that peak the slope is flat — the calculus test for a maximum. Too slow OR too fast and you fall short.')],[plot]));
+    host.appendChild(UI.appGrid([fin,vmin,vmax,v,alt,find,stats,UI.note('<b>Glide ratio</b> = feet forward per foot down. The curve <b>peaks</b> at the best-glide speed, where the slope is flat — the calculus test for a maximum. Too slow OR too fast and you fall short. Type your own G(v) and speed range to test it.')],[plot]));
+    plot.enableZoom(render);
+    function bestSpeed(){ return argExtreme(fin.fn(),vmin.get(),vmax.get(),true); }
+    function syncRanges(){ let lo=vmin.get(),hi=vmax.get(); if(!(hi>lo))hi=lo+1; v.range(lo,hi,Math.max(0.5,(hi-lo)/120)); if(v.get()<lo||v.get()>hi)v.set(lo+(hi-lo)*0.2); }
     function render(){
-      const vv=v.get(), h=alt.get();
-      const ratio=G(vv), best=G(vstar);
-      const dist=ratio*h/6076;                   // glide distance, NM (1 NM = 6076 ft)
+      const f=fin.fn(); if(!f)return; const lo=vmin.get(); let hi=vmax.get(); if(!(hi>lo))hi=lo+1;
+      const vv=M.clamp(v.get(),lo,hi), h=alt.get();
+      const vstar=bestSpeed(); const ratio=f(vv), best=f(vstar);
+      const dist=ratio*h/6076;
       stats.set([
         {k:'Glide ratio now',v:ratio.toFixed(1)+' : 1'},
         {k:'Glide distance',v:dist.toFixed(1)+' NM'},
-        {k:'Best speed gives',v:best.toFixed(1)+' : 1',accent:true},
+        {k:'Best ('+Math.round(vstar)+' kt) gives',v:best.toFixed(1)+' : 1',accent:true},
       ]);
-      const ch=plot.chart(); ch.setX(40,100).setY(0,12); ch.clear();
-      ch.gridlines(niceTicks(40,100,6),niceTicks(0,12,6)); ch.axes();
-      ch.axisX(niceTicks(40,100,6),x=>x+'kt'); ch.axisY(niceTicks(0,12,6));
-      ch.curve(G,COL.optim,2.8);
+      const ch=plot.chart(); ch.setX(lo,hi);
+      const [ylo,yhi]=autoY(f,lo,hi,{include:[0,best]}); ch.setY(Math.min(0,ylo),yhi); ch.clear();
+      ch.gridlines(niceTicks(lo,hi,6),niceTicks(ch.ymin,ch.ymax,6)); ch.axes();
+      ch.axisX(niceTicks(lo,hi,6),x=>x+'kt'); ch.axisY(niceTicks(ch.ymin,ch.ymax,6));
+      ch.curve(f,COL.optim,2.8);
       ch.vline(vstar,hexA(COL.green,.5),1.5,[5,4]); ch.dot(vstar,best,COL.green,6);
       ch.vline(vv,hexA(COL.calc1,.5),1.5,[4,3]); ch.dot(vv,ratio,COL.calc1,6);
       const ctx=ch.ctx; ctx.fillStyle=COL.green; ctx.font='bold 10px "JetBrains Mono",monospace'; ctx.textAlign='center';
       ctx.fillText('best glide '+Math.round(vstar)+' kt', ch.X(vstar), ch.Y(best)-10);
     }
-    render();
+    syncRanges(); render();
   }
 });
 
@@ -920,35 +994,39 @@ add({ id:'best-range', cat:'optim', tag:'maximize range', title:'Best Range Airs
   questions:['Flying faster gets you there sooner — so why doesn’t the fastest speed give the most range?','The best-range speed is the peak of the curve. What is the slope at that peak?','If you carry more fuel, does the best-range speed change, or just the range?'],
   blurb:'With a fixed tank of fuel, one cruise speed flies the farthest. Too fast and fuel flow soars; too slow and you waste gallons just hanging in the air.',
   build(host){
-    const b0=4.5, b2=4.5/12100;
-    const burn=v=>b0+b2*v*v;                  // gph
-    const SR=v=>v/burn(v);                     // nm per gallon
-    const vstar=Math.sqrt(b0/b2);             // best-range speed ≈ 110 kt
+    const fin=makeFnInput('Fuel flow burn(v), gph','4.5 + 0.00037*v^2',['v'],()=>{syncRanges();render();},'v = knots;  try: 4.5+0.00037*v^2,  3+0.0005*v^2');
+    const vmin=UI.number({label:'Speed range — min (kt)',value:70,step:'any',onchange:()=>{syncRanges();render();}});
+    const vmax=UI.number({label:'Speed range — max (kt)',value:170,step:'any',onchange:()=>{syncRanges();render();}});
     const v=UI.slider({label:'Cruise airspeed (knots)',min:70,max:170,step:1,value:150,fmt:x=>x+' kt',oninput:render});
     const fuel=UI.slider({label:'Usable fuel (gallons)',min:20,max:80,step:1,value:40,fmt:x=>x+' gal',oninput:render});
-    const find=UI.buttons([{label:'⛽ Set best-range speed',primary:true,onclick:()=>{ v.set(Math.round(vstar)); render(); }}]);
+    const find=UI.buttons([{label:'⛽ Set best-range speed',primary:true,onclick:()=>{ v.set(Math.round(bestSpeed())); render(); }},{label:'Demo',onclick:()=>{fin.set('4.5 + 0.00037*v^2');vmin.set(70);vmax.set(170);syncRanges();render();}}]);
     const stats=UI.statsBox();
     const plot=UI.plotCard('Range vs cruise airspeed',360);
-    host.appendChild(UI.appGrid([v,fuel,find,stats,UI.note('Range = fuel × miles-per-gallon. Miles-per-gallon peaks at one speed (≈ '+Math.round(vstar)+' kt here) and falls off on both sides. The <b>top of the curve</b> — where its slope is zero — is the best-range speed.')],[plot]));
+    host.appendChild(UI.appGrid([fin,vmin,vmax,v,fuel,find,stats,UI.note('Range = fuel × miles-per-gallon, and mpg = v ÷ fuel-flow. Plug in your own fuel-flow curve burn(v): the tool builds the range curve, finds its <b>peak</b> (slope = 0) and marks the best-range speed. Too fast and fuel flow soars; too slow and you waste gallons hanging in the air.')],[plot]));
+    plot.enableZoom(render);
+    function rngFn(){ const f=fin.fn(), F=fuel.get(); return v2=>F*v2/f(v2); }
+    function bestSpeed(){ return argExtreme(rngFn(),vmin.get(),vmax.get(),true); }
+    function syncRanges(){ let lo=vmin.get(),hi=vmax.get(); if(!(hi>lo))hi=lo+1; v.range(lo,hi,Math.max(0.5,(hi-lo)/120)); if(v.get()<lo||v.get()>hi)v.set(lo+(hi-lo)*0.8); }
     function render(){
-      const vv=v.get(), F=fuel.get();
-      const rng=v2=>F*SR(v2);
+      const f=fin.fn(); if(!f)return; const lo=vmin.get(); let hi=vmax.get(); if(!(hi>lo))hi=lo+1;
+      const vv=M.clamp(v.get(),lo,hi);
+      const rng=rngFn(); const vstar=bestSpeed(); const SR=x=>x/f(x);
       stats.set([
-        {k:'Fuel flow now',v:burn(vv).toFixed(1)+' gph'},
+        {k:'Fuel flow now',v:f(vv).toFixed(1)+' gph'},
         {k:'Miles per gallon',v:SR(vv).toFixed(2)+' nm/gal'},
-        {k:'Range',v:Math.round(rng(vv)).toLocaleString()+' NM',accent:true},
+        {k:'Range (best '+Math.round(vstar)+' kt)',v:Math.round(rng(vv)).toLocaleString()+' NM',accent:true},
       ]);
-      const maxR=rng(vstar)*1.08;
-      const ch=plot.chart(); ch.setX(70,170).setY(0,maxR); ch.clear();
-      ch.gridlines(niceTicks(70,170,6),niceTicks(0,maxR,6)); ch.axes();
-      ch.axisX(niceTicks(70,170,6),x=>x+'kt'); ch.axisY(niceTicks(0,maxR,6),x=>Math.round(x));
+      const ch=plot.chart(); ch.setX(lo,hi);
+      const [ylo,yhi]=autoY(rng,lo,hi,{include:[0,rng(vstar)]}); ch.setY(Math.min(0,ylo),yhi); ch.clear();
+      ch.gridlines(niceTicks(lo,hi,6),niceTicks(ch.ymin,ch.ymax,6)); ch.axes();
+      ch.axisX(niceTicks(lo,hi,6),x=>x+'kt'); ch.axisY(niceTicks(ch.ymin,ch.ymax,6),x=>Math.round(x));
       ch.curve(rng,COL.optim,2.8);
       ch.vline(vstar,hexA(COL.green,.5),1.5,[5,4]); ch.dot(vstar,rng(vstar),COL.green,6);
       ch.vline(vv,hexA(COL.calc1,.5),1.5,[4,3]); ch.dot(vv,rng(vv),COL.calc1,6);
       const ctx=ch.ctx; ctx.fillStyle=COL.green; ctx.font='bold 10px "JetBrains Mono",monospace'; ctx.textAlign='center';
       ctx.fillText('best range '+Math.round(vstar)+' kt', ch.X(vstar), ch.Y(rng(vstar))-10);
     }
-    render();
+    syncRanges(); render();
   }
 });
 
@@ -1027,29 +1105,34 @@ add({ id:'distance-from-speed', cat:'integ', tag:'area = total', title:'Distance
   questions:['Fly twice as long at the same speed — how does the area (distance) change?','With the speed changing, how do thin rectangles help estimate total distance?','As you use more, thinner slices, what happens to the estimate?'],
   blurb:'Your distance flown is the area underneath your speed-vs-time graph. Slice the flight into thin time-strips, add up speed × time for each, and you’ve found the distance.',
   build(host){
-    const sp=t=>Math.max(40, 130 + 55*Math.sin(0.8*t-0.6));  // knots, t in hours
-    const T=3;
+    const fin=makeFnInput('Ground speed v(t), knots','130 + 55*sin(0.8*t - 0.6)',['t'],()=>render(),'t = hours;  try: 130+55*sin(0.8*t-0.6),  100+20*t,  150');
+    const t0=UI.number({label:'Start time (h)',value:0,step:'any',onchange:render});
+    const t1=UI.number({label:'End time (h)',value:3,step:'any',onchange:render});
     const n=UI.slider({label:'Number of time-slices',min:1,max:60,step:1,value:6,fmt:v=>v+' slices',oninput:render});
     const rule=UI.seg({label:'Rectangle height taken at',options:[{label:'Left',value:'left'},{label:'Middle',value:'mid'},{label:'Right',value:'right'}],value:'mid',onchange:render});
     const stats=UI.statsBox();
     const plot=UI.plotCard('Ground speed (kt) vs time (hours)',360);
-    host.appendChild(UI.appGrid([n,rule,stats,UI.note('Each rectangle is <b>speed × a slice of time</b> = distance for that slice (knots × hours = nautical miles). Add them all for the total. More, thinner slices → the staircase hugs the curve → the estimate locks onto the true distance (the <b>integral</b>).')],[plot]));
+    host.appendChild(UI.appGrid([fin,t0,t1,n,rule,stats,UI.note('Each rectangle is <b>speed × a slice of time</b> = distance for that slice (knots × hours = nautical miles). Add them for the total. More, thinner slices → the staircase hugs the curve → the estimate locks onto the true distance (the <b>integral</b>). Edit the speed curve and the time window.')],[plot]));
+    plot.enableZoom(render);
     function render(){
+      const sp=fin.fn(); if(!sp)return; let A=t0.get(), B=t1.get(); if(!(B>A))B=A+1;
       const N=n.get(), mode=rule.get();
-      const est=M.riemann(sp,0,T,N,mode), exact=M.integrate(sp,0,T,400);
+      const est=M.riemann(sp,A,B,N,mode), exact=M.integrate(sp,A,B,400);
       stats.set([
         {k:'Estimated distance',v:est.toFixed(1)+' NM',accent:true},
         {k:'True distance',v:exact.toFixed(1)+' NM'},
         {k:'Off by',v:Math.abs(est-exact).toFixed(1)+' NM'},
       ]);
-      const ch=plot.chart(); ch.setX(0,T).setY(0,220); ch.clear();
-      ch.gridlines(niceTicks(0,T,6),niceTicks(0,220,6)); ch.axes();
-      ch.axisX(niceTicks(0,T,6),v=>v+'h'); ch.axisY(niceTicks(0,220,6));
-      const h=T/N, ctx=ch.ctx;
-      for(let i=0;i<N;i++){ const xl=i*h, xr=xl+h; const xs = mode==='left'?xl: mode==='right'?xr:(xl+xr)/2; const hgt=sp(xs);
-        const x=ch.X(xl), w=ch.X(xr)-ch.X(xl), y=ch.Y(hgt);
-        ctx.fillStyle=hexA(COL.calc3,.18); ctx.fillRect(x+0.5,y,Math.max(1,w-1),ch.py0-y);
-        ctx.strokeStyle=hexA(COL.calc3,.55); ctx.lineWidth=1; ctx.strokeRect(x+0.5,y,Math.max(1,w-1),ch.py0-y); }
+      const ch=plot.chart(); ch.setX(A,B);
+      const [ylo,yhi]=autoY(sp,A,B,{include:[0]}); ch.setY(Math.min(0,ylo),yhi); ch.clear();
+      ch.gridlines(niceTicks(A,B,6),niceTicks(ch.ymin,ch.ymax,6)); ch.axes();
+      ch.axisX(niceTicks(A,B,6),v=>v+'h'); ch.axisY(niceTicks(ch.ymin,ch.ymax,6));
+      const h=(B-A)/N, ctx=ch.ctx; ch.clip();
+      for(let i=0;i<N;i++){ const xl=A+i*h, xr=xl+h; const xs = mode==='left'?xl: mode==='right'?xr:(xl+xr)/2; const hgt=sp(xs);
+        const x=ch.X(xl), w=ch.X(xr)-ch.X(xl), y=ch.Y(hgt), base=ch.Y(0);
+        ctx.fillStyle=hexA(COL.calc3,.18); ctx.fillRect(x+0.5,y,Math.max(1,w-1),base-y);
+        ctx.strokeStyle=hexA(COL.calc3,.55); ctx.lineWidth=1; ctx.strokeRect(x+0.5,y,Math.max(1,w-1),base-y); }
+      ch.unclip();
       ch.curve(sp,COL.calc3,2.6);
     }
     render();
@@ -1061,28 +1144,35 @@ add({ id:'fuel-from-flow', cat:'integ', tag:'area = total', title:'Fuel Burned =
   questions:['Climb burns fuel fast; cruise burns less. How does that show up as area?','Gallons-per-hour × hours = what unit? Why does that make the area a fuel total?','Starting with 40 gallons, how do you find what’s left after the flight?'],
   blurb:'Fuel flow changes through a flight — rich in the climb, leaner in cruise. Total fuel burned is the area under the fuel-flow curve over time.',
   build(host){
-    const ff=t=>6.5 + 5.5*Math.exp(-t*1.6) + 0.4*Math.sin(t*2);   // gph, t in hours
-    const T=3, tank=40;
+    const fin=makeFnInput('Fuel flow ff(t), gph','6.5 + 5.5*exp(-1.6*t) + 0.4*sin(2*t)',['t'],()=>render(),'t = hours;  try: 6.5+5.5*exp(-1.6*t),  8,  5+t');
+    const t0=UI.number({label:'Start time (h)',value:0,step:'any',onchange:render});
+    const t1=UI.number({label:'End time (h)',value:3,step:'any',onchange:render});
+    const tankIn=UI.number({label:'Usable fuel in tank (gal)',value:40,step:'any',onchange:render});
     const n=UI.slider({label:'Number of time-slices',min:1,max:60,step:1,value:8,fmt:v=>v+' slices',oninput:render});
+    const rule=UI.seg({label:'Rectangle height taken at',options:[{label:'Left',value:'left'},{label:'Middle',value:'mid'},{label:'Right',value:'right'}],value:'mid',onchange:render});
     const stats=UI.statsBox();
     const plot=UI.plotCard('Fuel flow (gph) vs time (hours)',360);
-    host.appendChild(UI.appGrid([n,stats,UI.note('Each strip is <b>gallons-per-hour × hours = gallons</b> burned in that slice. Sum the strips for total fuel used — exactly what a fuel totalizer integrates in flight. The tank here starts at '+tank+' gallons.')],[plot]));
+    host.appendChild(UI.appGrid([fin,t0,t1,tankIn,n,rule,stats,UI.note('Each strip is <b>gallons-per-hour × hours = gallons</b> burned in that slice. Sum the strips for total fuel used — exactly what a fuel totalizer integrates in flight. Edit the flow curve, window, and tank size.')],[plot]));
+    plot.enableZoom(render);
     function render(){
-      const N=n.get();
-      const est=M.riemann(ff,0,T,N,'mid'), exact=M.integrate(ff,0,T,400);
+      const ff=fin.fn(); if(!ff)return; let A=t0.get(), B=t1.get(); if(!(B>A))B=A+1; const tank=tankIn.get();
+      const N=n.get(), mode=rule.get();
+      const est=M.riemann(ff,A,B,N,mode), exact=M.integrate(ff,A,B,400);
       stats.set([
         {k:'Fuel burned · estimate',v:est.toFixed(1)+' gal',accent:true},
         {k:'Fuel burned · true',v:exact.toFixed(1)+' gal'},
         {k:'Fuel remaining',v:(tank-exact).toFixed(1)+' gal'},
       ]);
-      const ch=plot.chart(); ch.setX(0,T).setY(0,14); ch.clear();
-      ch.gridlines(niceTicks(0,T,6),niceTicks(0,14,7)); ch.axes();
-      ch.axisX(niceTicks(0,T,6),v=>v+'h'); ch.axisY(niceTicks(0,14,7));
-      const h=T/N, ctx=ch.ctx;
-      for(let i=0;i<N;i++){ const xl=i*h, xm=xl+h/2, hgt=ff(xm);
-        const x=ch.X(xl), w=ch.X(xl+h)-ch.X(xl), y=ch.Y(hgt);
-        ctx.fillStyle=hexA(COL.calc3,.18); ctx.fillRect(x+0.5,y,Math.max(1,w-1),ch.py0-y);
-        ctx.strokeStyle=hexA(COL.calc3,.5); ctx.lineWidth=1; ctx.strokeRect(x+0.5,y,Math.max(1,w-1),ch.py0-y); }
+      const ch=plot.chart(); ch.setX(A,B);
+      const [ylo,yhi]=autoY(ff,A,B,{include:[0]}); ch.setY(Math.min(0,ylo),yhi); ch.clear();
+      ch.gridlines(niceTicks(A,B,6),niceTicks(ch.ymin,ch.ymax,7)); ch.axes();
+      ch.axisX(niceTicks(A,B,6),v=>v+'h'); ch.axisY(niceTicks(ch.ymin,ch.ymax,7));
+      const h=(B-A)/N, ctx=ch.ctx; ch.clip();
+      for(let i=0;i<N;i++){ const xl=A+i*h, xr=xl+h; const xs=mode==='left'?xl:mode==='right'?xr:(xl+xr)/2, hgt=ff(xs);
+        const x=ch.X(xl), w=ch.X(xr)-ch.X(xl), y=ch.Y(hgt), base=ch.Y(0);
+        ctx.fillStyle=hexA(COL.calc3,.18); ctx.fillRect(x+0.5,y,Math.max(1,w-1),base-y);
+        ctx.strokeStyle=hexA(COL.calc3,.5); ctx.lineWidth=1; ctx.strokeRect(x+0.5,y,Math.max(1,w-1),base-y); }
+      ch.unclip();
       ch.curve(ff,COL.calc3,2.6);
     }
     render();
@@ -1137,32 +1227,39 @@ add({ id:'limit-explorer', cat:'calc1', tag:'type a function', title:'Limit Expl
 /* ----- Limits at Infinity & Horizontal Asymptotes ----- */
 add({ id:'limits-at-infinity', cat:'calc1', tag:'type a function', title:'Limits at Infinity & Asymptotes', diff:'inter', ch:'Limits at infinity',
   questions:['As x grows huge, does f(x) settle toward a single number?','A horizontal asymptote is that settling value — does your function have one to the right? To the left?','Try (3x+1)/(x−2): what value does it level off at, and why?'],
-  blurb:'Type a function and push x toward +∞ and −∞. If the values settle, you have found a horizontal asymptote.',
+  blurb:'Type a function and push x toward +∞ and −∞ to find horizontal asymptotes — and watch the tool flag vertical asymptotes where the curve blows up.',
   build(host){
     const fin=makeFnInput('Function f(x)','(3*x+1)/(x-2)',['x'],()=>render(),'try: (3x+1)/(x-2),  1/x,  x/sqrt(x^2+1)');
     const tbl=document.createElement('div'); tbl.className='formula'; tbl.style.lineHeight='2';
     const plot=UI.plotCard('f(x) over a wide range',320);
-    host.appendChild(UI.appGrid([fin,UI.note('Plug in bigger and bigger x. If f(x) homes in on a number L, the line <b>y = L</b> is a <b>horizontal asymptote</b> — the curve hugs it but may never touch. The left and right ends can settle to different values.'),tbl],[plot]));
+    host.appendChild(UI.appGrid([fin,UI.note('Plug in bigger and bigger x. If f(x) homes in on a number L, the line <b>y = L</b> is a <b>horizontal asymptote</b> (left and right ends can settle differently). Where the function blows up instead, the tool marks a <b>vertical asymptote</b> (rose dashed line) at that x.'),tbl],[plot]));
     plot.enableZoom(render);
     function settle(f,sign){ const xs=[10,100,1000,1e4,1e5]; let v=NaN; xs.forEach(x=>{ const y=f(sign*x); if(isFinite(y))v=y; }); return v; }
     function render(){
       const f=fin.fn(); if(!f)return;
       const Lp=settle(f,1), Lm=settle(f,-1);
+      const ch=plot.chart(); ch.setX(-50,50);
+      const xlo=ch.xmin, xhi=ch.xmax;
+      const vas=vAsymptotes(f,xlo,xhi);
       let rows='<b>x → +∞</b><br>';
       [10,100,1000,10000].forEach(x=>{ const y=f(x); rows+='x = '+x.toLocaleString()+' → f = '+(isFinite(y)?M.round(y,4):'—')+'<br>'; });
       rows+='<br><b>x → −∞</b><br>';
       [-10,-100,-1000,-10000].forEach(x=>{ const y=f(x); rows+='x = '+x.toLocaleString()+' → f = '+(isFinite(y)?M.round(y,4):'—')+'<br>'; });
-      rows+='<br><b style="color:'+COL.calc1+'">right: '+(isFinite(Lp)?'y → '+M.round(Lp,4):'grows without bound')+'</b>';
-      rows+='<br><b style="color:'+COL.calc2+'">left: '+(isFinite(Lm)?'y → '+M.round(Lm,4):'grows without bound')+'</b>';
+      rows+='<br><b style="color:'+COL.calc1+'">right: '+(isFinite(Lp)?'horizontal asymptote  y = '+M.round(Lp,4):'grows without bound')+'</b>';
+      rows+='<br><b style="color:'+COL.calc2+'">left: '+(isFinite(Lm)?'horizontal asymptote  y = '+M.round(Lm,4):'grows without bound')+'</b>';
+      rows+='<br><b style="color:'+COL.rose+'">vertical asymptotes: '+(vas.length? vas.map(x=>'x = '+M.round(x,3)).join(',  ') : 'none in view')+'</b>';
       tbl.innerHTML=rows;
-      const ch=plot.chart(); ch.setX(-50,50);
-      const ys=[]; for(let i=0;i<=120;i++){ const x=-50+100*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e4)ys.push(y); }
-      let ylo=ys.length?M.min(ys):-5, yhi=ys.length?M.max(ys):5; const pad=(yhi-ylo)*0.15||1;
-      ch.setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(-50,50,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
-      ch.axisX(niceTicks(-50,50,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
-      if(isFinite(Lp)) ch.line(0,Lp,50,Lp,hexA(COL.calc1,.5),1.8,[6,4]);
-      if(isFinite(Lm)) ch.line(-50,Lm,0,Lm,hexA(COL.calc2,.5),1.8,[6,4]);
+      const [ylo,yhi]=autoY(f,xlo,xhi,{include:[isFinite(Lp)?Lp:NaN,isFinite(Lm)?Lm:NaN]});
+      ch.setY(ylo,yhi); ch.clear(); ch.gridlines(niceTicks(xlo,xhi,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
+      ch.axisX(niceTicks(xlo,xhi,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      ch.clip();
+      if(isFinite(Lp)) ch.line(Math.max(0,xlo),Lp,xhi,Lp,hexA(COL.calc1,.5),1.8,[6,4]);
+      if(isFinite(Lm)) ch.line(xlo,Lm,Math.min(0,xhi),Lm,hexA(COL.calc2,.5),1.8,[6,4]);
+      vas.forEach(xv=>ch.vline(xv,hexA(COL.rose,.6),1.6,[5,4]));
       ch.curve(f,COL.optim,2.4);
+      ch.unclip();
+      const ctx=ch.ctx; ctx.fillStyle=COL.rose; ctx.font='bold 10px "JetBrains Mono",monospace'; ctx.textAlign='center';
+      vas.forEach(xv=>{ if(xv>xlo&&xv<xhi) ctx.fillText('x='+M.round(xv,2), ch.X(xv), ch.py1+10); });
     }
     render();
   }
@@ -1177,15 +1274,19 @@ add({ id:'derivative-grapher', cat:'deriv', tag:'type a function', title:'Graph 
     const px=UI.slider({label:'Point x',min:-5,max:5,step:.1,value:1,fmt:v=>v.toFixed(1),oninput:render});
     const stats=UI.statsBox();
     const top=UI.plotCard('f(x)',230), bot=UI.plotCard('slope of f  =  f′(x)',230);
-    host.appendChild(UI.appGrid([fin,px,stats,UI.note('The bottom graph plots the <b>slope</b> of the top graph at each x. A flat spot up top → the slope graph crosses <b>zero</b>. Uphill → slope positive (above the axis). Downhill → slope negative.')],[top,bot]));
+    const sym=UI.formula(''); sym.style.fontSize='.92rem'; sym.style.textAlign='center';
+    host.appendChild(UI.appGrid([fin,px,stats,UI.note('The bottom graph plots the <b>slope</b> of the top graph at each x. A flat spot up top → the slope graph crosses <b>zero</b>. Uphill → slope positive (above the axis); downhill → negative. The exact formula for f′(x) is written out beneath the slope graph whenever the function is a standard one.')],[top,bot,sym]));
+    top.enableZoom(render); bot.enableZoom(render);
     function render(){
       const f=fin.fn(); if(!f)return; const x0=px.get(); const fp=x=>M.nderiv(f,x);
       stats.set([{k:'f(x)',v:M.round(f(x0),3)},{k:'slope f′(x)',v:M.round(fp(x0),3),accent:true}]);
+      try{ const t=Sym.parse(fin.get(),['x']); const d=Sym.simp(Sym.diff(t)); sym.set('<b>f′(x) = '+Sym.str(d)+'</b>'); }
+      catch(e){ sym.set('f′(x): drawn numerically — type a standard function to see the exact formula'); }
       let ys=[]; for(let i=0;i<=120;i++){ const x=-5+10*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let lo=ys.length?M.min(ys):-3,hi=ys.length?M.max(ys):3,pad=(hi-lo)*.15||1;
-      let c=top.chart(); c.setX(-5,5).setY(lo-pad,hi+pad); c.clear(); c.gridlines(niceTicks(-5,5,6),niceTicks(c.ymin,c.ymax,5)); c.axes(); c.axisX(niceTicks(-5,5,6)); c.axisY(niceTicks(c.ymin,c.ymax,5)); c.curve(f,COL.calc1,2.4);
-      const m=fp(x0),b=f(x0); c.line(-5,m*(-5-x0)+b,5,m*(5-x0)+b,hexA(COL.deriv,.5),1.8,[6,4]); c.vline(x0,hexA(COL.optim,.5),1.5,[4,3]); c.dot(x0,b,COL.optim,5);
+      let c=top.chart(); c.setX(-5,5).setY(lo-pad,hi+pad); c.clear(); c.gridlines(niceTicks(c.xmin,c.xmax,6),niceTicks(c.ymin,c.ymax,5)); c.axes(); c.axisX(niceTicks(c.xmin,c.xmax,6)); c.axisY(niceTicks(c.ymin,c.ymax,5)); c.clip(); c.curve(f,COL.calc1,2.4);
+      const m=fp(x0),b=f(x0); c.line(-5,m*(-5-x0)+b,5,m*(5-x0)+b,hexA(COL.deriv,.5),1.8,[6,4]); c.unclip(); c.vline(x0,hexA(COL.optim,.5),1.5,[4,3]); c.dot(x0,b,COL.optim,5);
       let ys2=[]; for(let i=0;i<=120;i++){ const x=-5+10*i/120; const y=fp(x); if(isFinite(y)&&Math.abs(y)<1e3)ys2.push(y);} let lo2=ys2.length?M.min(ys2):-3,hi2=ys2.length?M.max(ys2):3,pad2=(hi2-lo2)*.15||1;
-      let d=bot.chart(); d.setX(-5,5).setY(lo2-pad2,hi2+pad2); d.clear(); d.gridlines(niceTicks(-5,5,6),niceTicks(d.ymin,d.ymax,5)); d.axes(); d.axisX(niceTicks(-5,5,6)); d.axisY(niceTicks(d.ymin,d.ymax,5)); d.curve(fp,COL.deriv,2.4); d.vline(x0,hexA(COL.optim,.5),1.5,[4,3]); d.dot(x0,fp(x0),COL.optim,5);
+      let d=bot.chart(); d.setX(-5,5).setY(lo2-pad2,hi2+pad2); d.clear(); d.gridlines(niceTicks(d.xmin,d.xmax,6),niceTicks(d.ymin,d.ymax,5)); d.axes(); d.axisX(niceTicks(d.xmin,d.xmax,6)); d.axisY(niceTicks(d.ymin,d.ymax,5)); d.clip(); d.curve(fp,COL.deriv,2.4); d.unclip(); d.vline(x0,hexA(COL.optim,.5),1.5,[4,3]); d.dot(x0,fp(x0),COL.optim,5);
     }
     render();
   }
@@ -1221,8 +1322,10 @@ add({ id:'first-derivative-test', cat:'optim', tag:'type a function', title:'Loc
   build(host){
     const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  x^4-2x^2,  sin(x)');
     const info=document.createElement('div'); info.className='formula'; info.style.lineHeight='1.9';
-    const plot=UI.plotCard('f(x): rising in green, falling in red',360);
-    host.appendChild(UI.appGrid([fin,UI.note('Green = <b>increasing</b> (slope +). Red = <b>decreasing</b> (slope −). Where it switches green→red is a <b>local max</b>; red→green is a <b>local min</b>. That switch is the first-derivative test.'),info],[plot]));
+    const plot=UI.plotCard('f(x): rising in green, falling in red',330);
+    const dplot=UI.plotCard('slope f′(x): crosses zero under each max/min',230);
+    host.appendChild(UI.appGrid([fin,UI.note('Green = <b>increasing</b> (slope +). Red = <b>decreasing</b> (slope −). Green→red is a <b>local max</b>; red→green a <b>local min</b> — the first-derivative test. The lower graph is f′(x); it <b>crosses zero</b> right under each max/min. Scroll on either graph to zoom in or out.'),info],[plot,dplot]));
+    plot.enableZoom(render); dplot.enableZoom(render);
     function render(){
       const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
@@ -1232,11 +1335,16 @@ add({ id:'first-derivative-test', cat:'optim', tag:'type a function', title:'Loc
       crit.forEach(c=>{ rows+='<b style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>'; });
       info.innerHTML=rows;
       let ys=[]; for(let i=0;i<=120;i++){ const x=lo+(hi-lo)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let ylo=ys.length?M.min(ys):-3,yhi=ys.length?M.max(ys):3,pad=(yhi-ylo)*.15||1;
-      const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(lo,hi,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(lo,hi,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
-      const ctx=ch.ctx; let pX=null,pY=null;
+      const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      ch.clip(); const ctx=ch.ctx; let pX=null,pY=null;
       for(let i=0;i<=N;i++){ const x=lo+i*h, y=f(x); if(!isFinite(y)){pX=null;continue;} const yc=M.clamp(y,ch.ymin-50,ch.ymax+50); const up=fp(x)>=0;
         if(pX!==null){ ctx.strokeStyle=up?COL.calc2:COL.coral; ctx.lineWidth=2.7; ctx.beginPath(); ctx.moveTo(ch.X(pX),ch.Y(pY)); ctx.lineTo(ch.X(x),ch.Y(yc)); ctx.stroke(); } pX=x; pY=yc; }
+      ch.unclip();
       crit.forEach(c=>ch.dot(c.x,c.y,c.kind==='max'?COL.optim:COL.calc2,6));
+      let yd=[]; for(let i=0;i<=120;i++){ const x=lo+(hi-lo)*i/120; const y=fp(x); if(isFinite(y)&&Math.abs(y)<1e3)yd.push(y);} let dlo=yd.length?M.min(yd):-3,dhi=yd.length?M.max(yd):3,dpad=(dhi-dlo)*.15||1;
+      const dc=dplot.chart(); dc.setX(lo,hi).setY(Math.min(0,dlo)-dpad,Math.max(0,dhi)+dpad); dc.clear(); dc.gridlines(niceTicks(dc.xmin,dc.xmax,6),niceTicks(dc.ymin,dc.ymax,5)); dc.axes(); dc.axisX(niceTicks(dc.xmin,dc.xmax,6)); dc.axisY(niceTicks(dc.ymin,dc.ymax,5));
+      dc.clip(); dc.curve(fp,COL.deriv,2.2); dc.unclip();
+      crit.forEach(c=>dc.dot(c.x,0,c.kind==='max'?COL.optim:COL.calc2,5));
     }
     render();
   }
@@ -1249,10 +1357,16 @@ add({ id:'concavity', cat:'optim', tag:'type a function', title:'Concavity & Inf
   build(host){
     const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  x^4-6x^2,  sin(x)');
     const info=document.createElement('div'); info.className='formula'; info.style.lineHeight='1.9';
-    const plot=UI.plotCard('blue = concave up · orange = concave down',360);
-    host.appendChild(UI.appGrid([fin,UI.note('Concavity comes from the <b>second derivative</b>. Where it is positive the curve is <b>concave up</b> (a cup); where negative it is <b>concave down</b> (a dome). The switch points are <b>inflection points</b>.'),info],[plot]));
+    const plot=UI.plotCard('blue = concave up · orange = concave down',330);
+    const d1=UI.plotCard('first derivative f′(x)',205);
+    const d2=UI.plotCard('second derivative f″(x): + = cup, − = dome, 0 = inflection',205);
+    host.appendChild(UI.appGrid([fin,UI.note('Concavity comes from the <b>second derivative</b>. Where f″ is positive the curve is <b>concave up</b> (a cup, blue); where negative, <b>concave down</b> (a dome, orange). Inflection points are where f″ = 0. Both f′ and f″ are drawn below so you can see the clues directly. Scroll any graph to zoom in or out.'),info],[plot,d1,d2]));
+    plot.enableZoom(render); d1.enableZoom(render); d2.enableZoom(render);
+    function drawAux(card,g,color){
+      let yd=[]; for(let i=0;i<=120;i++){ const x=-5+10*i/120; const y=g(x); if(isFinite(y)&&Math.abs(y)<1e3)yd.push(y);} let glo=yd.length?M.min(yd):-3,ghi=yd.length?M.max(yd):3,gp=(ghi-glo)*.15||1;
+      const c=card.chart(); c.setX(-5,5).setY(Math.min(0,glo)-gp,Math.max(0,ghi)+gp); c.clear(); c.gridlines(niceTicks(c.xmin,c.xmax,6),niceTicks(c.ymin,c.ymax,4)); c.axes(); c.axisX(niceTicks(c.xmin,c.xmax,6)); c.axisY(niceTicks(c.ymin,c.ymax,4)); c.clip(); c.curve(g,color,2.1); c.unclip(); return c; }
     function render(){
-      const f=fin.fn(); if(!f)return; const f2=x=>M.nderiv2(f,x);
+      const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x), f2=x=>M.nderiv2(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
       const infl=[]; let prev=f2(lo);
       for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(prev)&&isFinite(cur)&&prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m; } const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } prev=cur; }
@@ -1260,11 +1374,15 @@ add({ id:'concavity', cat:'optim', tag:'type a function', title:'Concavity & Inf
       infl.forEach(c=>{ rows+='<b style="color:'+COL.calc3+'">inflection</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>'; });
       info.innerHTML=rows;
       let ys=[]; for(let i=0;i<=120;i++){ const x=lo+(hi-lo)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let ylo=ys.length?M.min(ys):-3,yhi=ys.length?M.max(ys):3,pad=(yhi-ylo)*.15||1;
-      const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(lo,hi,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(lo,hi,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
-      const ctx=ch.ctx; let pX=null,pY=null;
+      const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      ch.clip(); const ctx=ch.ctx; let pX=null,pY=null;
       for(let i=0;i<=N;i++){ const x=lo+i*h, y=f(x); if(!isFinite(y)){pX=null;continue;} const yc=M.clamp(y,ch.ymin-50,ch.ymax+50); const up=f2(x)>=0;
         if(pX!==null){ ctx.strokeStyle=up?COL.calc1:COL.optim; ctx.lineWidth=2.7; ctx.beginPath(); ctx.moveTo(ch.X(pX),ch.Y(pY)); ctx.lineTo(ch.X(x),ch.Y(yc)); ctx.stroke(); } pX=x; pY=yc; }
+      ch.unclip();
       infl.forEach(c=>ch.dot(c.x,c.y,COL.calc3,6));
+      drawAux(d1,fp,COL.deriv);
+      const dd=drawAux(d2,f2,COL.amber);
+      infl.forEach(c=>dd.dot(c.x,0,COL.calc3,5));
     }
     render();
   }
@@ -1280,7 +1398,8 @@ add({ id:'curve-sketcher', cat:'optim', tag:'type a function', title:'Curve Sket
     const showD2=UI.seg({label:'Show bend f″(x)?',options:[{label:'Hide',value:'0'},{label:'Show',value:'1'}],value:'0',onchange:render});
     const info=document.createElement('div'); info.className='formula'; info.style.lineHeight='1.8';
     const plot=UI.plotCard('full sketch — green up · red down · purple = inflection',380);
-    host.appendChild(UI.appGrid([fin,showD1,showD2,UI.note('Green/red = increasing/decreasing (from the slope). Orange dot = local max, teal dot = local min. Purple dot = inflection point (from the bend). Flip on the f′ and f″ overlays to see the clues behind the sketch.'),info],[plot]));
+    host.appendChild(UI.appGrid([fin,showD1,showD2,UI.note('Green/red = increasing/decreasing (from the slope). Orange dot = local max, teal dot = local min. Purple dot = inflection point (from the bend). Flip on the f′ and f″ overlays to see the clues behind the sketch. Scroll to zoom in or out.'),info],[plot]));
+    plot.enableZoom(render);
     function render(){
       const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x), f2=x=>M.nderiv2(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
@@ -1293,12 +1412,14 @@ add({ id:'curve-sketcher', cat:'optim', tag:'type a function', title:'Curve Sket
       rows += infl.length ? infl.map(c=>'<span style="color:'+COL.calc3+'">inflection</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ') : 'no inflection points in view';
       info.innerHTML=rows;
       let ys=[]; for(let i=0;i<=120;i++){ const x=lo+(hi-lo)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let ylo=ys.length?M.min(ys):-3,yhi=ys.length?M.max(ys):3,pad=(yhi-ylo)*.18||1;
-      const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(lo,hi,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(lo,hi,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      ch.clip();
       if(showD1.get()==='1') ch.curve(fp,hexA(COL.deriv,.6),1.6);
       if(showD2.get()==='1') ch.curve(f2,hexA(COL.amber,.75),1.6);
       const ctx=ch.ctx; let pX=null,pY=null;
       for(let i=0;i<=N;i++){ const x=lo+i*h, y=f(x); if(!isFinite(y)){pX=null;continue;} const yc=M.clamp(y,ch.ymin-50,ch.ymax+50); const up=fp(x)>=0;
         if(pX!==null){ ctx.strokeStyle=up?COL.calc2:COL.coral; ctx.lineWidth=2.9; ctx.beginPath(); ctx.moveTo(ch.X(pX),ch.Y(pY)); ctx.lineTo(ch.X(x),ch.Y(yc)); ctx.stroke(); } pX=x; pY=yc; }
+      ch.unclip();
       crit.forEach(c=>ch.dot(c.x,c.y,c.kind==='max'?COL.optim:COL.calc2,6));
       infl.forEach(c=>ch.dot(c.x,c.y,COL.calc3,5));
     }
@@ -1316,19 +1437,20 @@ add({ id:'definite-integral', cat:'integ', tag:'type a function', title:'Definit
     const bIn=UI.number({label:'upper limit b',value:3.14159,step:'any',onchange:render});
     const stats=UI.statsBox();
     const top=UI.plotCard('f(x) with shaded signed area',250), bot=UI.plotCard('running total  F(x) = area from a to x',230);
-    host.appendChild(UI.appGrid([fin,aIn,bIn,stats,UI.note('<b>Signed area</b>: above the axis adds, below subtracts. The lower graph is the running total F(x). The <b>Fundamental Theorem</b> says its slope is f itself — F′(x) = f(x).')],[top,bot]));
+    host.appendChild(UI.appGrid([fin,aIn,bIn,stats,UI.note('<b>Signed area</b>: above the axis adds, below subtracts. The lower graph is the running total F(x). The <b>Fundamental Theorem</b> says its slope is f itself — F′(x) = f(x). Scroll either graph to zoom in or out.')],[top,bot]));
+    top.enableZoom(render); bot.enableZoom(render);
     function render(){
       const f=fin.fn(); if(!f)return; let a=aIn.get(), b=bIn.get();
       const val=M.integrate(f,a,b,500);
       stats.set([{k:'integral a → b',v:M.round(val,4),accent:true},{k:'interval',v:'['+M.round(a,2)+', '+M.round(b,2)+']'}]);
       const xlo=Math.min(a,b)-1, xhi=Math.max(a,b)+1;
       let ys=[]; for(let i=0;i<=120;i++){ const x=xlo+(xhi-xlo)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let ylo=Math.min(0,ys.length?M.min(ys):-1),yhi=Math.max(0,ys.length?M.max(ys):1),pad=(yhi-ylo)*.15||1;
-      const c=top.chart(); c.setX(xlo,xhi).setY(ylo-pad,yhi+pad); c.clear(); c.gridlines(niceTicks(xlo,xhi,6),niceTicks(c.ymin,c.ymax,5)); c.axes(); c.axisX(niceTicks(xlo,xhi,6)); c.axisY(niceTicks(c.ymin,c.ymax,5));
+      const c=top.chart(); c.setX(xlo,xhi).setY(ylo-pad,yhi+pad); c.clear(); c.gridlines(niceTicks(c.xmin,c.xmax,6),niceTicks(c.ymin,c.ymax,5)); c.axes(); c.axisX(niceTicks(c.xmin,c.xmax,6)); c.axisY(niceTicks(c.ymin,c.ymax,5));
       const A=Math.min(a,b),B=Math.max(a,b);
-      c.shade(f,A,B,hexA(COL.calc3,.18)); c.curve(f,COL.calc3,2.4); c.vline(a,hexA(COL.optim,.5),1.5,[4,3]); c.vline(b,hexA(COL.optim,.5),1.5,[4,3]);
+      c.clip(); c.shade(f,A,B,hexA(COL.calc3,.18)); c.curve(f,COL.calc3,2.4); c.unclip(); c.vline(a,hexA(COL.optim,.5),1.5,[4,3]); c.vline(b,hexA(COL.optim,.5),1.5,[4,3]);
       const F=x=>M.integrate(f,a,x,200);
       let ys2=[]; for(let i=0;i<=60;i++){ const x=xlo+(xhi-xlo)*i/60; const y=F(x); if(isFinite(y)&&Math.abs(y)<1e3)ys2.push(y);} let lo2=ys2.length?M.min(ys2):-1,hi2=ys2.length?M.max(ys2):1,pad2=(hi2-lo2)*.15||1;
-      const d=bot.chart(); d.setX(xlo,xhi).setY(lo2-pad2,hi2+pad2); d.clear(); d.gridlines(niceTicks(xlo,xhi,6),niceTicks(d.ymin,d.ymax,5)); d.axes(); d.axisX(niceTicks(xlo,xhi,6)); d.axisY(niceTicks(d.ymin,d.ymax,5)); d.curve(F,COL.calc1,2.2); d.dot(b,F(b),COL.optim,5);
+      const d=bot.chart(); d.setX(xlo,xhi).setY(lo2-pad2,hi2+pad2); d.clear(); d.gridlines(niceTicks(d.xmin,d.xmax,6),niceTicks(d.ymin,d.ymax,5)); d.axes(); d.axisX(niceTicks(d.xmin,d.xmax,6)); d.axisY(niceTicks(d.ymin,d.ymax,5)); d.clip(); d.curve(F,COL.calc1,2.2); d.unclip(); d.dot(b,F(b),COL.optim,5);
     }
     render();
   }
