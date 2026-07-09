@@ -590,8 +590,21 @@ const UI = {
     inp.addEventListener('input',()=>onchange(inp.value)); inp.addEventListener('change',()=>onchange(inp.value));
     w.get=()=>inp.value; w.set=(v)=>inp.value=v; w.input=inp; return w; },
   number({label,value,step='any',min,max,hint,onchange}){ const w=document.createElement('div'); w.className='ctrl';
-    w.innerHTML=`<label>${label}</label><input type="number" value="${value}" step="${step}" ${min!=null?`min="${min}"`:''} ${max!=null?`max="${max}"`:''}>${hint?`<span class="hint">${hint}</span>`:''}`;
-    const inp=w.querySelector('input'); inp.addEventListener('input',()=>onchange(+inp.value)); w.get=()=>+inp.value; w.set=(v)=>inp.value=v; return w; },
+    // type="text" (not type="number") so the field can accept math expressions like
+    // "pi", "2*pi", "e", "sqrt(2)" — a native <input type="number"> silently rejects
+    // any character that isn't a digit/./-/e-for-exponent, so "pi" never even registers.
+    w.innerHTML=`<label>${label}</label><input type="text" inputmode="decimal" value="${value}">${hint?`<span class="hint">${hint}</span>`:''}<span class="hint numerr" style="display:block"></span>`;
+    const inp=w.querySelector('input'), err=w.querySelector('.numerr'); err.style.color=COL.coral;
+    let cur = (typeof value==='number' && isFinite(value)) ? value : 0;
+    function parseIt(fire){
+      try{ const f=compileExpr(inp.value,[]); const v=f(); if(!isFinite(v)) throw new Error('not a number');
+        cur=v; err.textContent=''; inp.style.borderColor=''; if(fire) onchange(cur); }
+      catch(e){ err.textContent='⚠ '+e.message; inp.style.borderColor=COL.coral; }
+    }
+    parseIt(false);
+    inp.addEventListener('input',()=>parseIt(true));
+    inp.addEventListener('change',()=>parseIt(true));
+    w.get=()=>cur; w.set=(v)=>{ inp.value=v; parseIt(false); }; w.input=inp; return w; },
   textarea({label,value,hint,onchange}){ const w=document.createElement('div'); w.className='ctrl';
     w.innerHTML=`<label>${label}</label><textarea>${value}</textarea>${hint?`<span class="hint">${hint}</span>`:''}`;
     const t=w.querySelector('textarea'); t.addEventListener('input',()=>onchange(t.value)); w.get=()=>t.value; w.set=(v)=>t.value=v; return w; },
@@ -1439,8 +1452,8 @@ add({ id:'definite-integral', cat:'integ', tag:'type a function', title:'Definit
   blurb:'Type a function and choose limits a and b. See the signed area shaded, its value, and the running-total curve that the Fundamental Theorem ties back to f.',
   build(host){
     const fin=makeFnInput('Integrand f(x)','sin(x)',['x'],()=>render(),'try: sin(x),  x^2,  x,  1/x');
-    const aIn=UI.number({label:'lower limit a',value:0,step:'any',onchange:render});
-    const bIn=UI.number({label:'upper limit b',value:3.14159,step:'any',onchange:render});
+    const aIn=UI.number({label:'lower limit a',value:0,step:'any',hint:'numbers or expressions: pi, 2*pi, e, sqrt(2)',onchange:render});
+    const bIn=UI.number({label:'upper limit b',value:'pi',step:'any',hint:'numbers or expressions: pi, 2*pi, e, sqrt(2)',onchange:render});
     const stats=UI.statsBox();
     const top=UI.plotCard('f(x) with shaded signed area',250), bot=UI.plotCard('running total  F(x) = area from a to x',230);
     host.appendChild(UI.appGrid([fin,aIn,bIn,stats,UI.note('<b>Signed area</b>: above the axis adds, below subtracts. The lower graph is the running total F(x). The <b>Fundamental Theorem</b> says its slope is f itself — F′(x) = f(x). Scroll either graph to zoom in or out.')],[top,bot]));
