@@ -1375,10 +1375,12 @@ add({ id:'implicit-differentiation', cat:'deriv', tag:'type an equation', title:
   build(host){
     const eqIn=UI.text({label:'Equation in x and y',value:'x^3 + y^3 = 6*x*y',hint:'use * for every multiplication, e.g. 6*x*y (not 6xy);  try: x^3+y^3=6*x*y,  x^2+y^2=25,  x^2/9-y^2/4=1,  sin(x*y)=x'});
     const err=document.createElement('div'); err.className='hint'; err.style.color=COL.coral; eqIn.appendChild(err);
+    const pxIn=UI.number({label:'point x',value:3,step:'any',onchange:()=>setPointFromInputs()});
+    const pyIn=UI.number({label:'point y',value:3,step:'any',onchange:()=>setPointFromInputs()});
     const stats=UI.statsBox();
     const sym=UI.formula('');
-    const plot=UI.plotCard('Click anywhere on the curve to drop a point',420);
-    host.appendChild(UI.appGrid([eqIn,stats,sym,UI.note('This curve is <b>implicit</b> \u2014 it isn\u2019t written as y = f(x). Differentiate both sides with respect to x (each y-term picks up a factor of <b>dy/dx</b> by the chain rule), then solve algebraically for dy/dx. The exact result is shown above. <b>Click the curve</b> to drop a point and see the tangent line and the slope there.')],[plot]));
+    const plot=UI.plotCard('Click anywhere on the curve, or type a point below',420);
+    host.appendChild(UI.appGrid([eqIn,pxIn,pyIn,stats,sym,UI.note('This curve is <b>implicit</b> \u2014 it isn\u2019t written as y = f(x). Differentiate both sides with respect to x (each y-term picks up a factor of <b>dy/dx</b> by the chain rule), then solve algebraically for dy/dx. The exact result is shown above. <b>Click the curve</b>, or type a point\u2019s <b>x</b> and <b>y</b> above, to see the tangent line and the slope there \u2014 the point snaps to the nearest spot on the curve.')],[plot]));
 
     let Gf=null,Gxf=null,Gyf=null,dydxTree=null,ready=false,picked=null;
     const rng={xmin:-8,xmax:8,ymin:-8,ymax:8};
@@ -1451,8 +1453,14 @@ add({ id:'implicit-differentiation', cat:'deriv', tag:'type an equation', title:
       const r=plot.canvas.getBoundingClientRect();
       const mx=ch.ix(e.clientX-r.left), my=ch.iy(e.clientY-r.top);
       const p=projectOnCurve(mx,my);
-      if(p){ picked=p; render(); }
+      if(p){ picked=p; pxIn.set(M.round(p[0],4)); pyIn.set(M.round(p[1],4)); render(); }
     });
+    function setPointFromInputs(){
+      if(!ready) return;
+      const p=projectOnCurve(pxIn.get(),pyIn.get());
+      if(p){ picked=p; render(); }
+      else stats.set([{k:'note',v:'no curve point found near ('+M.round(pxIn.get(),3)+', '+M.round(pyIn.get(),3)+') \u2014 try a point closer to the curve'}]);
+    }
 
     function render(){
       const ch=plot.chart(); ch.setX(rng.xmin,rng.xmax).setY(rng.ymin,rng.ymax);
@@ -1461,7 +1469,7 @@ add({ id:'implicit-differentiation', cat:'deriv', tag:'type an equation', title:
       ch.gridlines(niceTicks(ch.xmin,ch.xmax,8),niceTicks(ch.ymin,ch.ymax,8)); ch.axes();
       ch.axisX(niceTicks(ch.xmin,ch.xmax,8)); ch.axisY(niceTicks(ch.ymin,ch.ymax,8));
       const segs=implicitSegments(ch.xmin,ch.xmax,ch.ymin,ch.ymax,130,110);
-      if(!picked&&segs.length){ const s=segs[Math.floor(segs.length/2)]; const mid=[(s[0][0]+s[1][0])/2,(s[0][1]+s[1][1])/2]; picked=projectOnCurve(mid[0],mid[1])||mid; }
+      if(!picked&&segs.length){ const s=segs[Math.floor(segs.length/2)]; const mid=[(s[0][0]+s[1][0])/2,(s[0][1]+s[1][1])/2]; picked=projectOnCurve(mid[0],mid[1])||mid; pxIn.set(M.round(picked[0],4)); pyIn.set(M.round(picked[1],4)); }
       ch.clip();
       const ctx=ch.ctx; ctx.strokeStyle=COL.calc1; ctx.lineWidth=2.4; ctx.lineJoin='round'; ctx.beginPath();
       segs.forEach(s=>{ ctx.moveTo(ch.X(s[0][0]),ch.Y(s[0][1])); ctx.lineTo(ch.X(s[1][0]),ch.Y(s[1][1])); }); ctx.stroke();
