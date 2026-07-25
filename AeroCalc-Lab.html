@@ -447,6 +447,17 @@ function renderMath(el,latex,display=true){
     katex.render(latex,el,{throwOnError:false,displayMode:display});
   }catch(e){ el.textContent=latex; }
 }
+/* mix plain text with inline math: any $...$ span is rendered via KaTeX
+   (forced \displaystyle so fractions/limits/sums don't get cramped into
+   textstyle), everything else passes through untouched. Safe to call on
+   strings with no $ in them at all. */
+function mixMath(str){
+  if(str==null) return '';
+  return String(str).replace(/\$([^$]+)\$/g, (m,latex)=>{
+    try{ return katex.renderToString('\\displaystyle '+latex,{throwOnError:false,displayMode:false}); }
+    catch(e){ return latex; }
+  });
+}
 
 class Chart{
   constructor(canvas,{m={t:16,r:16,b:34,l:46},cssH=null,zoom=null}={}){
@@ -601,6 +612,11 @@ const CATS = {
       {t:'fact',s:'Engine power fades with altitude because there’s less air to burn — turbochargers fight that curve.'},
       {t:'note',s:'These two tools go a little past the syllabus — handy for intuition and for the aviation students, but optional.'}
     ]},
+  review:{name:'Practice & Test', color:COL.coral, n:'★', desc:'A self-graded review pulling questions from every chapter above — reading climb-rate graphs, best glide and best range, area-under-the-curve, and the thinning atmosphere.',
+    facts:[
+      {t:'fact',s:'Working a mixed review — instead of one topic at a time — is closer to how an exam actually tests you.'},
+      {t:'use',s:'Every question comes back with a worked explanation, right or wrong, so a miss becomes a quick refresher instead of a dead end.'}
+    ]},
 };
 const APPLETS = [];
 const add = (a)=>APPLETS.push(a);
@@ -705,7 +721,7 @@ function makeFnInput(label,initial,vars,onok,hint){
 /* ===== Sym: tiny symbolic engine (parse → tree, eval, diff, simplify, print, compile) ===== */
 const Sym = (function(){
   const U1=['asin','acos','atan','sinh','cosh','tanh','sin','cos','tan','sec','csc','cot','exp','ln','log','log10','sqrt','abs','sign','floor','ceil','round'];
-  function tokenize(s){ const t=[]; let i=0; s=convertAbsBars(s.replace(/\s+/g,''));
+  function tokenize(s){ const t=[]; let i=0; s=convertAbsBars(s.replace(/\s+/g,'')).replace(/\{/g,'(').replace(/\}/g,')');
     while(i<s.length){ const c=s[i];
       if(/[0-9.]/.test(c)){ let j=i+1; while(j<s.length&&/[0-9.]/.test(s[j]))j++; t.push({t:'num',v:parseFloat(s.slice(i,j))}); i=j; }
       else if(/[a-zA-Z]/.test(c)){ let j=i+1; while(j<s.length&&/[a-zA-Z0-9]/.test(s[j]))j++; t.push({t:'id',v:s.slice(i,j)}); i=j; }
@@ -2333,6 +2349,326 @@ add({ id:'definite-integral', cat:'integ', tag:'type a function', title:'Definit
     }
     render();
   }
+});
+
+/* ----- Antiderivatives: From Rate Back to Total ----- */
+add({ id:'antiderivative-rate-to-total', cat:'integ', tag:'type a function', title:'Antiderivatives — From Rate Back to Total', diff:'inter', ch:'Antiderivatives',
+  questions:['Two antiderivatives of the same rate function differ only by a constant — why exactly?','If you\u2019d started with more fuel already on board, how would the F(t) curve change — shift, or change shape?','Where the rate f(t) is momentarily zero, what is the slope of F(t) doing at that same instant?'],
+  blurb:'Type any rate — climb rate, fuel flow, or acceleration — and find its antiderivative symbolically. Pin down the "+C" with a starting value (initial altitude, fuel already on board, or distance already flown) to get the one exact total function, and watch F′(t) reproduce the rate curve.',
+  build(host){
+    const fin=makeFnInput('rate f(t) — climb rate, fuel flow, speed, or accel.','6 - 0.5*t',['t'],()=>render(),'try: 6-0.5*t (fading climb rate), 12 (constant fuel flow), 3*t (accelerating speed), 8*exp(-t/4)');
+    const t0In=UI.number({label:'start time t₀',value:0,step:'any',onchange:render});
+    const y0In=UI.number({label:'starting value F(t₀) — initial altitude, fuel on board, or distance so far',value:1000,step:'any',onchange:render});
+    const tminIn=UI.number({label:'view window — start',value:0,step:'any',onchange:render});
+    const tmaxIn=UI.number({label:'view window — end',value:10,step:'any',onchange:()=>{syncCur();render();}});
+    const tCur=UI.slider({label:'show accumulated total up to time t',min:0,max:10,step:.05,value:5,fmt:v=>v.toFixed(2),oninput:render});
+    const demo=UI.buttons([
+      {label:'Demo: constant fuel flow',onclick:()=>{fin.set('9.5');t0In.set(0);y0In.set(40);tminIn.set(0);tmaxIn.set(4);syncCur();render();}},
+      {label:'Demo: fading climb rate',onclick:()=>{fin.set('6 - 0.5*t');t0In.set(0);y0In.set(1000);tminIn.set(0);tmaxIn.set(10);syncCur();render();}},
+      {label:'Demo: accelerating takeoff',onclick:()=>{fin.set('3*t');t0In.set(0);y0In.set(0);tminIn.set(0);tmaxIn.set(8);syncCur();render();}}
+    ]);
+    const formulaBox=UI.formula('');
+    const stats=UI.statsBox();
+    const top=UI.plotCard('rate f(t) — shaded area = accumulated total so far',230);
+    const bot=UI.plotCard('total F(t) — the antiderivative, pinned by F(t₀) = y₀',260);
+    host.appendChild(UI.appGrid([fin,t0In,y0In,tminIn,tmaxIn,tCur,demo,formulaBox,stats,
+      UI.note('An <b>antiderivative</b> F(t) of a rate f(t) satisfies F′(t) = f(t) — differentiating it hands you the rate right back. Every antiderivative of the same f differs only by a constant <b>C</b>; a starting value F(t₀) = y₀ (an initial altitude, initial fuel on board, or initial distance) pins that constant down to exactly one function — the one whose accumulated total actually matches your flight.')
+    ],[top,bot]));
+    top.enableZoom(render); bot.enableZoom(render);
+    function syncCur(){ let lo=tminIn.get(),hi=tmaxIn.get(); if(!(hi>lo))hi=lo+1; tCur.range(lo,hi,Math.max(0.01,(hi-lo)/200)); const v=tCur.get(); if(v<lo||v>hi) tCur.set((lo+hi)/2); }
+    function parseSymSrc(raw){ return Sym.parse((raw||'').toLowerCase().replace(/\s+/g,''),['t']); }
+    /* a small term-by-term symbolic antiderivative (w.r.t. t), since the
+       shared Sym.integrateSimple only handles single monomials in x, not
+       sums or an arbitrary variable name. Handles: constants, powers of t,
+       sums/differences, constant multiples/divisors, and sin/cos/exp of a
+       linear argument in t. Returns null when it can't find a closed form —
+       the plotted total is still exact either way, via numeric integration. */
+    function symIntegrate(tr){
+      tr=Sym.simp(tr);
+      const V=()=>Sym.V('t');
+      function hasT(t){
+        switch(t.k){
+          case 'n': return false;
+          case 'v': return t.n==='t';
+          case 'neg': case 'f': return hasT(t.a);
+          default: return hasT(t.a)||hasT(t.b);
+        }
+      }
+      switch(tr.k){
+        case 'n': return Sym.simp(Sym.mul(tr,V()));
+        case 'v': return tr.n==='t' ? Sym.simp(Sym.div(Sym.pow(V(),Sym.N(2)),Sym.N(2))) : Sym.simp(Sym.mul(tr,V()));
+        case 'neg': { const r=symIntegrate(tr.a); return r?Sym.simp(Sym.neg(r)):null; }
+        case '+': { const ra=symIntegrate(tr.a), rb=symIntegrate(tr.b); return (ra&&rb)?Sym.simp(Sym.add(ra,rb)):null; }
+        case '-': { const ra=symIntegrate(tr.a), rb=symIntegrate(tr.b); return (ra&&rb)?Sym.simp(Sym.sub(ra,rb)):null; }
+        case '*':
+          if(!hasT(tr.a)){ const r=symIntegrate(tr.b); return r?Sym.simp(Sym.mul(tr.a,r)):null; }
+          if(!hasT(tr.b)){ const r=symIntegrate(tr.a); return r?Sym.simp(Sym.mul(tr.b,r)):null; }
+          return null;
+        case '/':
+          if(!hasT(tr.b)){ const r=symIntegrate(tr.a); return r?Sym.simp(Sym.div(r,tr.b)):null; }
+          return null;
+        case '^':
+          if(tr.a.k==='v'&&tr.a.n==='t'&&tr.b.k==='n'&&!hasT(tr.b)){
+            const c=tr.b.v;
+            if(Math.abs(c+1)<1e-9) return Sym.fn('ln',Sym.fn('abs',V()));
+            return Sym.simp(Sym.div(Sym.pow(V(),Sym.N(c+1)),Sym.N(c+1)));
+          }
+          return null;
+        case 'f': {
+          const g=tr.a, dg=Sym.simp(Sym.diff(g,'t'));
+          if(dg.k!=='n'||Math.abs(dg.v)<1e-12) return null; // only linear-in-t arguments
+          const k=dg.v; let inner;
+          switch(tr.n){
+            case 'sin': inner=Sym.neg(Sym.fn('cos',g)); break;
+            case 'cos': inner=Sym.fn('sin',g); break;
+            case 'exp': inner=Sym.fn('exp',g); break;
+            case 'sinh': inner=Sym.fn('cosh',g); break;
+            case 'cosh': inner=Sym.fn('sinh',g); break;
+            default: return null;
+          }
+          return Sym.simp(Sym.div(inner,Sym.N(k)));
+        }
+        default: return null;
+      }
+    }
+    function render(){
+      const f=fin.fn(); if(!f) return;
+      const t0=t0In.get(), y0=y0In.get();
+      let lo=tminIn.get(), hi=tmaxIn.get(); if(!(hi>lo))hi=lo+1;
+      const tc=M.clamp(tCur.get(),lo,hi);
+      // numeric antiderivative — computed exactly this way whether or not a symbolic form is found below
+      const Fnum=(t)=>y0+M.integrate(f,t0,t,300);
+      // try a symbolic antiderivative for the formula display
+      try{
+        const tree=parseSymSrc(fin.input.value);
+        const Ftree=symIntegrate(tree);
+        if(Ftree){
+          const F0=Sym.ev(Ftree,{t:t0});
+          const C=M.round(y0-F0,4);
+          const finalTree=Sym.simp(Sym.add(Ftree,Sym.N(C)));
+          renderMath(formulaBox,'F(t) = '+Sym.tex(finalTree)+'\\quad\\left(C='+C+'\\text{, fixed by }F(t_0)=y_0\\right)',true);
+        } else {
+          formulaBox.innerHTML='<span class="hint">No simple closed-form antiderivative for this f(t) — the total curve below is still exact, computed via the Fundamental Theorem.</span>';
+        }
+      }catch(e){ formulaBox.innerHTML='<span class="hint">⚠ '+e.message+'</span>'; }
+      const Fc=Fnum(tc);
+      const slopeCheck=M.nderiv(Fnum,tc);
+      stats.set([
+        {k:'t (current)',v:M.round(tc,2)},
+        {k:'F(t) so far',v:M.round(Fc,3),accent:true},
+        {k:'f(t) — rate right now',v:M.round(f(tc),3)},
+        {k:'F′(t) — checked numerically',v:M.round(slopeCheck,3)}
+      ]);
+      // ----- top: rate curve with shaded accumulated area -----
+      let ys=[]; for(let i=0;i<=120;i++){ const t=lo+(hi-lo)*i/120; const y=f(t); if(isFinite(y)&&Math.abs(y)<1e4)ys.push(y); }
+      let ylo=Math.min(0,ys.length?M.min(ys):-1), yhi=Math.max(0,ys.length?M.max(ys):1), pad=padFor(ylo,yhi);
+      const ct=top.chart(); ct.setX(lo,hi).setY(ylo-pad,yhi+pad); ct.clear();
+      ct.gridlines(niceTicks(ct.xmin,ct.xmax,6),niceTicks(ct.ymin,ct.ymax,5)); ct.axes(); ct.axisX(niceTicks(ct.xmin,ct.xmax,6)); ct.axisY(niceTicks(ct.ymin,ct.ymax,5));
+      const A=Math.min(t0,tc), B=Math.max(t0,tc);
+      ct.clip(); ct.shade(f,A,B,hexA(COL.calc3,.2)); ct.curve(f,COL.calc3,2.4); ct.unclip();
+      ct.vline(t0,hexA(COL.optim,.5),1.5,[4,3]); ct.vline(tc,hexA(COL.calc1,.5),1.5,[4,3]);
+      // ----- bottom: antiderivative / accumulated total curve -----
+      let ys2=[]; for(let i=0;i<=120;i++){ const t=lo+(hi-lo)*i/120; const y=Fnum(t); if(isFinite(y)&&Math.abs(y)<1e6)ys2.push(y); }
+      let lo2=ys2.length?M.min(ys2):-1, hi2=ys2.length?M.max(ys2):1, pad2=padFor(lo2,hi2);
+      const cb=bot.chart(); cb.setX(lo,hi).setY(lo2-pad2,hi2+pad2); cb.clear();
+      cb.gridlines(niceTicks(cb.xmin,cb.xmax,6),niceTicks(cb.ymin,cb.ymax,5)); cb.axes(); cb.axisX(niceTicks(cb.xmin,cb.xmax,6)); cb.axisY(niceTicks(cb.ymin,cb.ymax,5));
+      cb.clip(); cb.curve(Fnum,COL.calc1,2.4); cb.unclip();
+      cb.dot(t0,y0,COL.optim,5.5); cb.dot(tc,Fc,COL.calc1,5.5);
+    }
+    syncCur(); render();
+  }
+});
+
+/* ----- Practice & Test — self-graded review quiz (all chapters) ----- */
+function shuffleArr(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+/* Reusable "Practice & Test" quiz builder. Each Reset draws a fresh random
+   subset from the pool (never repeating the immediately-previous set), math
+   renders via KaTeX in \displaystyle, and numeric answers use a plain
+   arrow-free text field that accepts small expressions (1/3, pi/2, sqrt(2),
+   2^(1/2) or 2^{1/2}, etc.), graded with a tolerance floor so anything
+   correct to 3 decimal places is always accepted. */
+function makeQuizBuild(pool, nQuestions=12){
+  return function build(host){
+    let lastSetKey='';
+    function drawQuiz(){
+      let picks;
+      do{
+        picks=shuffleArr(pool.map((q,i)=>i)).slice(0,Math.min(nQuestions,pool.length));
+      } while(pool.length>nQuestions && picks.slice().sort((a,b)=>a-b).join(',')===lastSetKey);
+      lastSetKey=picks.slice().sort((a,b)=>a-b).join(',');
+      return picks.map(i=>pool[i]);
+    }
+    function mcControl(options){
+      const w=document.createElement('div'); w.style.cssText='display:flex;flex-direction:column;gap:8px;';
+      let sel=-1;
+      const paint=()=>btns.forEach((bb,ii)=>{
+        const on=ii===sel;
+        bb.style.borderColor = on? COL.calc1 : 'var(--line)';
+        bb.style.background = on? hexA(COL.calc1,.08) : 'var(--paper)';
+        bb.style.fontWeight = on? '700':'500';
+        bb.style.color = on? COL.calc1 : 'var(--ink)';
+      });
+      const btns=options.map((opt,idx)=>{
+        const b=document.createElement('button'); b.type='button'; b.innerHTML=mixMath(opt);
+        b.style.cssText='text-align:left;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font-size:.88rem;cursor:pointer;transition:.15s;line-height:1.4;';
+        b.onclick=()=>{ sel=idx; paint(); };
+        w.appendChild(b); return b;
+      });
+      w.get=()=>sel; w.set=(v)=>{ sel=v; paint(); };
+      return w;
+    }
+    /* numeric answer: a plain text field (no native up/down spin arrows).
+       Accepts not just plain decimals but small math expressions — a
+       fraction like 1/3, sqrt(2), pi/2, e^2, 2^(1/2) or 2^{1/2}, etc. —
+       evaluated with the same expression engine used elsewhere in the app. */
+    function numControl(){
+      const w=document.createElement('div'); w.className='ctrl';
+      w.innerHTML=`<label>Your answer</label><input type="text" inputmode="text" autocomplete="off" placeholder="e.g. 0.5, 1/3, pi/2, sqrt(2), 2^(1/2)">`;
+      const inp=w.querySelector('input');
+      inp.addEventListener('input',()=>{ inp.value=inp.value.replace(/[^0-9a-zA-Z+\-*/^(){}. ]/g,''); });
+      w.get=()=>inp.value; w.set=(v)=>inp.value=v; w.input=inp;
+      return w;
+    }
+    /* evaluate a typed answer: try it as a small math expression first
+       (handles fractions, π, e, √, etc.), falling back to a plain number. */
+    function evalAnswerExpr(raw){
+      const s=(raw||'').trim(); if(!s) return NaN;
+      try{ const v=Sym.compile(s,[])(); if(isFinite(v)) return v; }catch(e){}
+      const v2=parseFloat(s); return isFinite(v2)?v2:NaN;
+    }
+    host.appendChild(UI.note('Answer every question below, then press <b>Check my answers</b>. Multiple-choice questions grade by your selection; numeric answers allow a small rounding tolerance (always at least ±0.0015, so anything correct to 3 decimal places is accepted) and can be typed either as a decimal or as a small expression — <b>1/3</b>, <b>pi/2</b>, <b>sqrt(2)</b>, <b>e^2</b>, <b>2^(1/2)</b>, <b>20^{1/3}</b> all work. Every question — right or wrong — shows a worked explanation. <b>Reset</b> draws a brand-new set of questions from a larger pool.'));
+    const wrap=document.createElement('div'); wrap.style.cssText='max-width:760px;margin-top:18px;';
+    host.appendChild(wrap);
+    const scoreBox=UI.statsBox(); scoreBox.style.cssText='max-width:760px;margin-bottom:14px;';
+    const btnRow=UI.buttons([{label:'Check my answers',primary:true,onclick:()=>grade()},{label:'Reset — new questions',onclick:()=>buildSet()}]);
+    btnRow.style.cssText='max-width:760px;';
+    host.appendChild(btnRow);
+    host.appendChild(scoreBox);
+    let qEls=[];
+    function buildSet(){
+      wrap.innerHTML=''; qEls=[];
+      const QUIZ=drawQuiz();
+      QUIZ.forEach((q,i)=>{
+        const card=document.createElement('div');
+        card.style.cssText='background:var(--white);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px;';
+        const tag=document.createElement('div'); tag.style.cssText='font-family:var(--mono);font-size:.66rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;';
+        tag.textContent=`Q${i+1} · ${q.topic}`;
+        const qtext=document.createElement('div'); qtext.style.cssText='font-size:.98rem;margin-bottom:8px;line-height:1.5;'; qtext.innerHTML=mixMath(q.stem);
+        card.append(tag,qtext);
+        if(q.expr){
+          const exprEl=document.createElement('div'); exprEl.style.cssText='margin:6px 0 14px;padding:12px 6px;background:var(--paper);border-radius:8px;overflow-x:auto;';
+          renderMath(exprEl,q.expr,true); // \displaystyle, centered
+          card.appendChild(exprEl);
+        } else {
+          card.style.paddingBottom='16px';
+        }
+        let control;
+        if(q.type==='mc'){ control=mcControl(q.options); } else { control=numControl(); }
+        card.appendChild(control);
+        const fb=document.createElement('div'); fb.style.cssText='display:none;margin-top:12px;font-size:.85rem;line-height:1.55;padding-top:10px;border-top:1px dashed var(--line);';
+        card.appendChild(fb);
+        wrap.appendChild(card);
+        qEls.push({q,card,control,fb});
+      });
+      scoreBox.set([]);
+    }
+    function grade(){
+      let correct=0;
+      qEls.forEach(({q,card,control,fb})=>{
+        let ok=false, answered=true;
+        if(q.type==='mc'){
+          const sel=control.get(); answered=sel>=0; ok = sel===q.answer;
+        } else {
+          const raw=control.get();
+          answered = raw.trim()!=='';
+          const val=evalAnswerExpr(raw);
+          const effTol=Math.max(q.tol,0.0015); // always accept a value correct to 3 decimal places
+          ok = answered && isFinite(val) && Math.abs(val-q.answer)<=effTol;
+        }
+        card.style.borderLeftColor = ok?COL.calc2:COL.coral;
+        fb.style.display='block';
+        let head = !answered ? `<b style="color:${COL.amber}">No answer given.</b> ` : ok ? `<b style="color:${COL.calc2}">✓ Correct.</b> ` : `<b style="color:${COL.coral}">✗ Not quite.</b> `;
+        let answerNote='';
+        if(!ok){
+          answerNote = q.type==='mc'
+            ? ` <span style="color:${COL.soft}">(correct answer: ${mixMath(q.options[q.answer])})</span>`
+            : ` <span style="color:${COL.soft}">(correct answer ≈ ${q.answer})</span>`;
+        }
+        fb.innerHTML = head + mixMath(q.explain) + answerNote;
+        if(ok) correct++;
+      });
+      scoreBox.set([{k:'score', v:`${correct} / ${qEls.length}`, accent:true},{k:'percent', v:Math.round(100*correct/qEls.length)+'%'}]);
+      qEls[0].card.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }
+    buildSet();
+  };
+}
+const QUIZ_POOL_AVIATION = [
+  { topic:'Reading graphs', type:'mc', stem:'On an altitude-vs-time graph, the steepness (slope) of the curve at a point tells you the airplane\'s:', options:['rate of climb or descent at that moment','total distance flown so far','fuel remaining on board','airspeed indicator reading'], answer:0,
+    explain:'Slope is rise ÷ run — here, (change in altitude) ÷ (change in time) — which is exactly the rate of climb (or descent, if negative) at that instant. That\u2019s literally what a vertical speed indicator reads.' },
+  { topic:'Limits at infinity', type:'mc', stem:'A cruising airplane\'s altitude levels off toward a constant cruise altitude as $t\\to\\infty$. This behavior is described by:', options:['a horizontal asymptote — a limit at infinity','a vertical asymptote','a removable discontinuity','an inflection point'], answer:0,
+    explain:'As time grows without bound, the altitude approaches (but never quite reaches, in the idealized model) a fixed height — exactly the definition of a horizontal asymptote / limit at infinity.' },
+  { topic:'Limits', type:'numeric', stem:'Altitude is modeled by $h(t)=1000+9000\\left(1-e^{-t/8}\\right)$ feet ($t$ in minutes). Find $\\displaystyle\\lim_{t\\to\\infty}h(t)$, in thousands of feet.', answer:10, tol:0.1,
+    explain:'As $t\\to\\infty$, $e^{-t/8}\\to 0$, so $h(t)\\to 1000+9000(1-0)=10000$ ft $=10$ thousand feet — the cruise altitude the climb is leveling off toward.' },
+  { topic:'Continuity', type:'mc', stem:'If an altitude function $h(t)$ is continuous but has a sharp corner (no single well-defined tangent slope) at $t=a$, that typically corresponds to a moment when:', options:['the pilot abruptly changes the rate of climb (e.g. levels off suddenly)','the airplane is flying straight and level','the airplane\'s speed is exactly zero','the flight has already ended'], answer:0,
+    explain:'A corner means the slope jumps instantly from one value to another — altitude itself stays continuous (no teleporting), but the *rate of change* changes abruptly, exactly like snapping from climbing to level flight.' },
+  { topic:'Derivative = rate', type:'mc', stem:'The derivative of the altitude function $h(t)$ with respect to time is:', options:['the instantaneous rate of climb','the total altitude gained over the whole flight','the average airspeed','the acceleration'], answer:0,
+    explain:'Differentiating altitude with respect to time converts "how high" into "how fast that height is changing right now" — the instantaneous climb rate.' },
+  { topic:'Speed = derivative', type:'numeric', stem:'Distance down the runway is $d(t)=0.5\\cdot 7\\cdot t^2$ feet ($t$ in seconds). Find the ground speed $d\'(t)$ at $t=5$ s, in ft/s.', answer:35, tol:1,
+    explain:'$d(t)=3.5t^2$, so $d\'(t)=7t$. At $t=5$: $7(5)=35$ ft/s.' },
+  { topic:'Acceleration', type:'mc', stem:'Acceleration is the derivative of which quantity?', options:['speed (velocity)','position (distance)','altitude','fuel flow'], answer:0,
+    explain:'Position → velocity → acceleration is one derivative each: velocity is the rate of change of position, and acceleration is the rate of change of velocity.' },
+  { topic:'Acceleration', type:'numeric', stem:'Speed during a takeoff roll is $v(t)=5t$ m/s. Find the (constant) acceleration $v\'(t)$, in m/s².', answer:5, tol:0.2,
+    explain:'$v(t)=5t$ is linear in $t$, so its derivative — the acceleration — is the constant slope, $5$ m/s².' },
+  { topic:'Definition of the derivative', type:'mc', stem:'The exact climb rate at one instant $t$ is defined as:', options:['$\\displaystyle\\lim_{h\\to 0}\\frac{H(t+h)-H(t)}{h}$, where $H$ is altitude','$H(t+1)-H(t)$','the average of every climb rate during the whole flight','$H(t)/t$'], answer:0,
+    explain:'This is the definition of the derivative applied to altitude: shrink the time gap $h$ toward $0$, and the average rate of climb over that shrinking gap converges to the exact, instantaneous rate.' },
+  { topic:'Average rate of change', type:'numeric', stem:'Between $t=0$ min (altitude $0$ ft) and $t=10$ min (altitude $5000$ ft), find the average rate of climb, in ft/min.', answer:500, tol:5,
+    explain:'Average rate of change is (change in altitude) ÷ (change in time) $=\\dfrac{5000-0}{10-0}=500$ ft/min.' },
+  { topic:'Optimization', type:'mc', stem:'At the best-glide airspeed, the glide-ratio curve $G(v)$ satisfies:', options:['$G\'(v)=0$ — the curve is flat right at its peak','$G(v)=0$','$G\'(v)$ is undefined there','$G\'\'(v)=0$, regardless of $G\'(v)$'], answer:0,
+    explain:'Best glide is the airplane\u2019s single farthest-gliding speed — the top of the glide-ratio curve. At a smooth peak, the tangent line is horizontal, i.e. the derivative is zero.' },
+  { topic:'Optimization', type:'numeric', stem:'A glide-ratio function is $G(v)=12-\\dfrac{(v-65)^2}{180}$ (v in knots). Find the best-glide speed, in knots — where $G\'(v)=0$.', answer:65, tol:1,
+    explain:'$G\'(v)=-\\dfrac{2(v-65)}{180}$. Setting this to $0$ gives $v-65=0$, so $v=65$ kt — and indeed the parabola $G(v)$ is centered exactly there.' },
+  { topic:'First derivative test', type:'mc', stem:'If $G\'(v)>0$ for $v<v^*$ and $G\'(v)<0$ for $v>v^*$, the First Derivative Test says $v^*$ is a:', options:['local maximum','local minimum','a saddle point','an inflection point only'], answer:0,
+    explain:'The curve is rising right up to $v^*$ and falling right after it — climbing then falling is exactly the signature of a peak, i.e. a local maximum.' },
+  { topic:'Second derivative test', type:'mc', stem:'At a critical speed $v^*$ where $G\'(v^*)=0$, if $G\'\'(v^*)<0$, then $v^*$ gives a:', options:['local maximum (e.g. the best-glide or best-range peak)','local minimum','an inflection point','nothing — the test is inconclusive here'], answer:0,
+    explain:'Negative second derivative at a flat spot means the curve is concave down there — bending like a dome — which is exactly the shape of a peak, confirming a local maximum.' },
+  { topic:'Concavity', type:'numeric', stem:'A ballistic height model is $h(t)=-16t^2+100t$ feet ($t$ in seconds, constant gravity). Find $h\'\'(t)$, the (constant) value in ft/s².', answer:-32, tol:1,
+    explain:'$h\'(t)=-32t+100$, so $h\'\'(t)=-32$ ft/s² — the constant downward acceleration of gravity in this model, always concave down.' },
+  { topic:'Distance = area', type:'mc', stem:'Total distance flown equals:', options:['the area under the speed-vs-time graph','the area under the acceleration-vs-time graph','the slope of the altitude graph','the average speed alone, with no area involved'], answer:0,
+    explain:'Summing (speed × a tiny slice of time) over the whole flight — exactly what a definite integral does — adds up to the total distance covered, which is the area under the speed curve.' },
+  { topic:'Distance = area', type:'numeric', stem:'Ground speed is constant at $v(t)=120$ kt for $2.5$ hours. Find the distance flown, in nautical miles, using $\\displaystyle\\int_0^{2.5}v\\,dt$.', answer:300, tol:2,
+    explain:'For constant speed, the integral is just speed × time: $120\\times 2.5=300$ NM — the area under a flat line is a rectangle.' },
+  { topic:'Fuel = area', type:'mc', stem:'Total fuel burned during a flight equals:', options:['the area under the fuel-flow-vs-time graph','the slope of the fuel-flow graph','the fuel flow at the final instant only','the average fuel flow, with no area involved'], answer:0,
+    explain:'Fuel flow is measured in gallons <em>per hour</em>; multiplying by hours and summing over the flight — the area under that curve — gives total gallons burned, exactly what a fuel totalizer computes.' },
+  { topic:'Fuel = area', type:'numeric', stem:'Fuel flow is a constant $\\text{burn}(t)=10$ gph for a $3$-hour flight. Find total fuel burned, in gallons, via $\\displaystyle\\int_0^3 \\text{burn}(t)\\,dt$.', answer:30, tol:1,
+    explain:'Constant rate × time: $10 \\text{ gph}\\times 3\\text{ h}=30$ gallons.' },
+  { topic:'Distance = area', type:'numeric', stem:'A tailwind gives steadily increasing ground speed $v(t)=100+20t$ kt for $t\\in[0,2]$ hours. Find the total distance, in nautical miles, via $\\displaystyle\\int_0^2 v(t)\\,dt$.', answer:240, tol:2,
+    explain:'$\\int_0^2(100+20t)\\,dt=\\left[100t+10t^2\\right]_0^2=200+40=240$ NM.' },
+  { topic:'Riemann sums', type:'mc', stem:'A Riemann sum approximates the area under the speed curve (distance flown) using:', options:['a stack of thin rectangles, each with height = speed and width = a slice of time','one single large rectangle spanning the whole flight','the tangent line at just one instant','the derivative evaluated at each instant'], answer:0,
+    explain:'Chop the flight into short time slices, treat speed as roughly constant on each slice (a thin rectangle of height = speed, width = Δt), and sum every slice\u2019s little rectangle of distance.' },
+  { topic:'Riemann sums → integral', type:'mc', stem:'As the number of time-slices $n\\to\\infty$ in a Riemann sum for distance, the sum approaches:', options:['the exact definite integral — the true distance flown','zero, always, no matter what','the instantaneous ground speed at one instant','the average of the first and last speeds only'], answer:0,
+    explain:'As the rectangles get thinner, the staircase approximation hugs the true speed curve ever more closely, and the sum converges to the exact area — the definite integral, i.e. true total distance.' },
+  { topic:'Fundamental Theorem', type:'mc', stem:'The Fundamental Theorem of Calculus connects "area under speed" (distance) to:', options:['the position function itself — its antiderivative','the derivative of speed (acceleration)','the top airspeed only','nothing at all; they are unrelated'], answer:0,
+    explain:'The FTC is the bridge: accumulating speed via an integral gets you right back to the position function — integrating speed and differentiating position undo each other.' },
+  { topic:'Atmosphere (exp. decay)', type:'mc', stem:'Standard atmospheric pressure decreases with altitude roughly like:', options:['exponential decay — cut by about half every ~18,000 ft','a straight line, decreasing at a constant rate forever','it actually increases with altitude','a step function that jumps suddenly at one altitude'], answer:0,
+    explain:'Pressure is multiplied by roughly the same fraction for each equal step up — the signature of exponential decay — which is why it halves at regular altitude intervals rather than dropping at a constant rate.' },
+  { topic:'Atmosphere (exp. decay)', type:'numeric', stem:'Model pressure as $P(h)=P_0e^{-h/18000}$ ($h$ in feet). Find $P(18000)/P_0$ — the fraction of sea-level pressure remaining at 18,000 ft.', answer:0.3679, tol:0.01,
+    explain:'$P(18000)/P_0=e^{-18000/18000}=e^{-1}\\approx 0.368$ — a bit over a third of sea-level pressure remains, close to (though not exactly) the commonly-quoted "half every 18,000 ft" rule of thumb.' },
+  { topic:'Service ceiling', type:'mc', stem:'The "service ceiling" of an airplane is defined as the altitude where the best climb rate has dropped to:', options:['100 ft/min','0 ft/min (that\'s the absolute ceiling instead)','500 ft/min','1000 ft/min'], answer:0,
+    explain:'By convention, service ceiling is where climb performance has faded to just $100$ ft/min — still climbing, but barely. Going higher still (to $0$ ft/min) reaches the absolute ceiling instead.' },
+  { topic:'Absolute ceiling', type:'mc', stem:'The "absolute ceiling" is where the climb-rate-vs-altitude curve reaches:', options:['exactly zero — climb rate has run out entirely','its maximum value','a local minimum that\'s still positive','an inflection point only'], answer:0,
+    explain:'The absolute ceiling is the theoretical altitude where the airplane simply cannot climb any further — the best possible climb rate has been driven all the way down to $0$.' },
+  { topic:'Service/absolute ceiling', type:'numeric', stem:'A climb-rate function is $R(h)=1500-0.1h$ (ft/min, $h$ in feet). Find the absolute ceiling, in feet, where $R(h)=0$.', answer:15000, tol:100,
+    explain:'Solve $1500-0.1h=0 \\Rightarrow 0.1h=1500 \\Rightarrow h=15000$ ft.' },
+  { topic:'Derivative = rate', type:'mc', stem:'If the average rate of climb over shrinking time intervals keeps approaching one particular number, that number is:', options:['the instantaneous rate of climb (the derivative) at that instant','the total altitude gained over the whole flight','the airplane\'s maximum possible speed','always zero, no matter the flight'], answer:0,
+    explain:'This is exactly the derivative in action: as the time interval used for an average shrinks toward zero, the average rate of change converges to the exact, instantaneous rate at that moment.' },
+  { topic:'Acceleration → speed (integral)', type:'numeric', stem:'An airplane accelerates from rest with constant $a(t)=8$ ft/s² during its takeoff roll. Using $v(t)=\\displaystyle\\int_0^t a\\,d\\tau$, find its speed, in ft/s, after $7$ seconds.', answer:56, tol:1,
+    explain:'For constant acceleration, $v(t)=at$ (starting from rest), so $v(7)=8\\times 7=56$ ft/s.' }
+];
+add({ id:'practice-quiz-aviation', cat:'review', tag:'test yourself', title:'Practice & Test — Full Course Review', diff:'inter', ch:'All chapters review',
+  questions:['Which topics — reading a climb graph, optimization, area-under-the-curve, or the atmosphere model — feel shakiest right now?','When a question trips you up, is it the aviation framing, or the underlying calculus rule?','Could you re-derive the formula behind a question, rather than just recalling a number?'],
+  blurb:'A short, auto-graded review pulling from every chapter — reading a climb-rate graph, derivatives, optimization (best glide & range), area-under-the-curve, and the atmosphere — drawn from a larger pool. Press Reset for a fresh set of questions.',
+  build: makeQuizBuild(QUIZ_POOL_AVIATION, 12)
 });
 
 /* --------------------- (4) CATALOG RENDERING ------------------------ */
