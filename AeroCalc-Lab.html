@@ -577,6 +577,11 @@ function autoY(f,lo,hi,{pad=0.15,include=[],cap=1e4,samples=160}={}){
   const p=(yhi-ylo)*pad||1; return [ylo-p,yhi+p]; }
 /* ----------------------- (3) UI + REGISTRY -------------------------- */
 const CATS = {
+  review:{name:'Practice & Test', color:COL.coral, n:'★', desc:'A self-graded review pulling questions from every chapter — limits & continuity, derivative rules, optimization & curve sketching, antiderivatives & integrals, and the atmosphere model.',
+    facts:[
+      {t:'fact',s:'Working a mixed review — instead of one topic at a time — is closer to how an exam actually tests you.'},
+      {t:'use',s:'Every question comes back with a worked explanation, right or wrong, so a miss becomes a quick refresher instead of a dead end.'}
+    ]},
   calc1:{name:'Functions, Graphs & Limits', color:COL.calc1, n:'01', desc:'Reading a graph: what the height tells you, and what the steepness tells you. The foundation for everything after.',
     facts:[
       {t:'fact',s:'An altitude-vs-time graph already shows two things at once: how high you are (height) and how fast you’re climbing (steepness).'},
@@ -611,11 +616,6 @@ const CATS = {
       {t:'use',s:'Thinner air means longer takeoff rolls and weaker climb — the reason “density altitude” matters on a hot, high day.'},
       {t:'fact',s:'Engine power fades with altitude because there’s less air to burn — turbochargers fight that curve.'},
       {t:'note',s:'These two tools go a little past the syllabus — handy for intuition and for the aviation students, but optional.'}
-    ]},
-  review:{name:'Practice & Test', color:COL.coral, n:'★', desc:'A self-graded review pulling questions from every chapter above — reading climb-rate graphs, best glide and best range, area-under-the-curve, and the thinning atmosphere.',
-    facts:[
-      {t:'fact',s:'Working a mixed review — instead of one topic at a time — is closer to how an exam actually tests you.'},
-      {t:'use',s:'Every question comes back with a worked explanation, right or wrong, so a miss becomes a quick refresher instead of a dead end.'}
     ]},
 };
 const APPLETS = [];
@@ -2643,7 +2643,7 @@ const QUIZ_POOL_AVIATION = [
   { topic:'Fuel = area', type:'numeric', stem:'Fuel flow is a constant $\\text{burn}(t)=10$ gph for a $3$-hour flight. Find total fuel burned, in gallons, via $\\displaystyle\\int_0^3 \\text{burn}(t)\\,dt$.', answer:30, tol:1,
     explain:'Constant rate × time: $10 \\text{ gph}\\times 3\\text{ h}=30$ gallons.' },
   { topic:'Distance = area', type:'numeric', stem:'A tailwind gives steadily increasing ground speed $v(t)=100+20t$ kt for $t\\in[0,2]$ hours. Find the total distance, in nautical miles, via $\\displaystyle\\int_0^2 v(t)\\,dt$.', answer:240, tol:2,
-    explain:'$\\int_0^2(100+20t)\\,dt=\\left[100t+10t^2\\right]_0^2=200+40=240$ NM.' },
+    explain:'$\\displaystyle\\int_0^2(100+20t)\\,dt=\\left[100t+10t^2\\right]_0^2=200+40=240$ NM.' },
   { topic:'Riemann sums', type:'mc', stem:'A Riemann sum approximates the area under the speed curve (distance flown) using:', options:['a stack of thin rectangles, each with height = speed and width = a slice of time','one single large rectangle spanning the whole flight','the tangent line at just one instant','the derivative evaluated at each instant'], answer:0,
     explain:'Chop the flight into short time slices, treat speed as roughly constant on each slice (a thin rectangle of height = speed, width = Δt), and sum every slice\u2019s little rectangle of distance.' },
   { topic:'Riemann sums → integral', type:'mc', stem:'As the number of time-slices $n\\to\\infty$ in a Riemann sum for distance, the sum approaches:', options:['the exact definite integral — the true distance flown','zero, always, no matter what','the instantaneous ground speed at one instant','the average of the first and last speeds only'], answer:0,
@@ -2663,12 +2663,82 @@ const QUIZ_POOL_AVIATION = [
   { topic:'Derivative = rate', type:'mc', stem:'If the average rate of climb over shrinking time intervals keeps approaching one particular number, that number is:', options:['the instantaneous rate of climb (the derivative) at that instant','the total altitude gained over the whole flight','the airplane\'s maximum possible speed','always zero, no matter the flight'], answer:0,
     explain:'This is exactly the derivative in action: as the time interval used for an average shrinks toward zero, the average rate of change converges to the exact, instantaneous rate at that moment.' },
   { topic:'Acceleration → speed (integral)', type:'numeric', stem:'An airplane accelerates from rest with constant $a(t)=8$ ft/s² during its takeoff roll. Using $v(t)=\\displaystyle\\int_0^t a\\,d\\tau$, find its speed, in ft/s, after $7$ seconds.', answer:56, tol:1,
-    explain:'For constant acceleration, $v(t)=at$ (starting from rest), so $v(7)=8\\times 7=56$ ft/s.' }
+    explain:'For constant acceleration, $v(t)=at$ (starting from rest), so $v(7)=8\\times 7=56$ ft/s.' },
+  { topic:'Antiderivatives', type:'mc', stem:'An antiderivative $F(x)$ of a function $f(x)$ is any function satisfying:', options:['$F\'(x)=f(x)$','$F(x)=f\'(x)$','$F(x)=0$ for every $x$','$f(x)=0$ for every $x$'], answer:0,
+    explain:'By definition, $F$ is an antiderivative of $f$ exactly when differentiating $F$ returns $f$ back — antidifferentiation is the reverse of differentiation.' },
+  { topic:'Antiderivatives (power rule)', type:'mc', stem:'A turbine\'s thrust is changing at rate $T\'(v)=6v^2$ (lb per (m/s), as a function of airspeed $v$). Find the general antiderivative $T(v)$:', options:['$2v^3+C$','$6v^3+C$','$3v^3+C$','$18v+C$'], answer:0,
+    explain:'Reverse power rule: $\\displaystyle\\int 6v^2\\,dv=6\\cdot\\frac{v^3}{3}+C=2v^3+C$. Do not forget the $+C$ — any constant vanishes under differentiation.' },
+  { topic:'Indefinite integral', type:'mc', stem:'Evaluate $\\displaystyle\\int (4t^3-6t+5)\\,dt$.', options:['$t^4-3t^2+5t+C$','$12t^2-6t+C$','$t^4-3t^2+C$','$4t^4-6t^2+5t+C$'], answer:0,
+    explain:'Integrate term by term with the power rule: $\\displaystyle\\int 4t^3\\,dt=t^4$, $\\displaystyle\\int -6t\\,dt=-3t^2$, $\\displaystyle\\int 5\\,dt=5t$ — then add the constant of integration $C$.' },
+  { topic:'Indefinite integral + initial condition', type:'numeric', stem:'An airplane\'s vertical speed is $v(t)=3t^2-4t+C$ ft/min, found by integrating a known acceleration. If $v(0)=20$ ft/min, find $C$.', answer:20, tol:0.5,
+    explain:'Plug in $t=0$: $v(0)=3(0)^2-4(0)+C=C$. Since $v(0)=20$, the constant of integration is $C=20$.' },
+  { topic:'Indefinite integral + initial condition', type:'numeric', stem:'A drone\'s acceleration is $a(t)=6t$ ft/s², and its velocity at $t=0$ is $v(0)=5$ ft/s. Using $v(t)=\\displaystyle\\int a(t)\\,dt$, find $v(3)$, in ft/s.', answer:32, tol:0.5,
+    explain:'$\\displaystyle\\int 6t\\,dt=3t^2+C$. Since $v(0)=5$, $C=5$, so $v(t)=3t^2+5$. Then $v(3)=3(9)+5=32$ ft/s.' },
+  { topic:'Position from acceleration (double integration)', type:'numeric', stem:'A cargo plane accelerates down the runway at a constant $a(t)=4$ ft/s², starting from rest ($v(0)=0$) at position $s(0)=0$. Using $v(t)=\\displaystyle\\int a\\,dt$ and then $s(t)=\\displaystyle\\int v\\,dt$, find $s(5)$, in feet.', answer:50, tol:1,
+    explain:'$v(t)=4t$ since $v(0)=0$. Then $s(t)=\\displaystyle\\int 4t\\,dt=2t^2$ since $s(0)=0$. So $s(5)=2(25)=50$ ft — two integrations, one initial condition each.' },
+  { topic:'u-substitution', type:'mc', stem:'To evaluate $\\displaystyle\\int 2x(x^2+1)^3\\,dx$ by $u$-substitution, the natural choice is:', options:['$u=x^2+1$, so $du=2x\\,dx$','$u=2x$, so $du=2\\,dx$','$u=x^3$, so $du=3x^2\\,dx$','$u=(x^2+1)^3$, so $du=6x(x^2+1)^2\\,dx$'], answer:0,
+    explain:'The factor $2x\\,dx$ already sitting in the integrand is exactly $du$ once $u=x^2+1$ — that match is the signal to substitute there.' },
+  { topic:'u-substitution', type:'numeric', stem:'A wing\'s induced-drag work is modeled by $\\displaystyle\\int_0^1 2x(x^2+1)^3\\,dx$ (arbitrary units). Using $u=x^2+1$, evaluate this integral.', answer:3.75, tol:0.05,
+    explain:'$u=x^2+1,\\,du=2x\\,dx$. When $x=0,\\,u=1$; when $x=1,\\,u=2$. $\\displaystyle\\int_1^2 u^3\\,du=\\left[\\frac{u^4}{4}\\right]_1^2=\\frac{16-1}{4}=3.75$.' },
+  { topic:'u-substitution', type:'numeric', stem:'Using $u=4-0.1h$ (so $du=-0.1\\,dh$), evaluate $\\displaystyle\\int_0^{10}(4-0.1h)^2\\,dh$, a drag-vs-altitude model.', answer:34.667, tol:0.2,
+    explain:'When $h=0,u=4$; when $h=10,u=3$. $\\displaystyle\\int_0^{10}(4-0.1h)^2\\,dh=\\displaystyle\\int_4^3 u^2\\cdot(-10)\\,du=10\\displaystyle\\int_3^4 u^2\\,du=10\\left[\\frac{u^3}{3}\\right]_3^4=10\\cdot\\frac{64-27}{3}\\approx 34.67$.' },
+  { topic:'Definite integral (FTC)', type:'numeric', stem:'Ground speed is $v(t)=2t+50$ kt for $t\\in[0,3]$ hours. Find the distance flown, in nautical miles, via $\\displaystyle\\int_0^3 v(t)\\,dt$.', answer:159, tol:1,
+    explain:'$\\displaystyle\\int_0^3(2t+50)\\,dt=\\left[t^2+50t\\right]_0^3=9+150=159$ NM.' },
+  { topic:'Definite integral (FTC)', type:'numeric', stem:'Fuel flow ramps up linearly as $\\text{burn}(t)=8+2t$ gph over a $4$-hour flight. Find total fuel burned, in gallons, via $\\displaystyle\\int_0^4(8+2t)\\,dt$.', answer:48, tol:1,
+    explain:'$\\displaystyle\\int_0^4(8+2t)\\,dt=\\left[8t+t^2\\right]_0^4=32+16=48$ gallons.' },
+  { topic:'Definite integral properties', type:'mc', stem:'If $\\displaystyle\\int_0^5 v(t)\\,dt=240$ (total distance), then $\\displaystyle\\int_5^0 v(t)\\,dt$ equals:', options:['$-240$','$240$','$0$','cannot be determined'], answer:0,
+    explain:'Reversing the limits of a definite integral flips its sign: $\\displaystyle\\int_5^0 v\\,dt=-\\displaystyle\\int_0^5 v\\,dt=-240$.' },
+  { topic:'Optimization', type:'numeric', stem:'A cargo airline\'s fuel cost per hour is $C(v)=0.02v^2-6v+500$ dollars, for cruising speed $v$ (mph). Find the speed that minimizes cost, in mph, by solving $C\'(v)=0$.', answer:150, tol:2,
+    explain:'$C\'(v)=0.04v-6$. Setting this to $0$: $0.04v=6\\Rightarrow v=150$ mph.' },
+  { topic:'Optimization', type:'numeric', stem:'A rectangular ramp area next to a hangar wall (no fence needed there) is enclosed on the other three sides with $200$ ft of fencing. Letting $x$ be the width of the two sides perpendicular to the wall, the enclosed area is $A(x)=x(200-2x)$. Find the width $x$, in feet, that maximizes the area.', answer:50, tol:1,
+    explain:'$A(x)=200x-2x^2$, so $A\'(x)=200-4x$. Setting this to $0$ gives $x=50$ ft — and the wall-length side is then $200-2(50)=100$ ft.' },
+  { topic:'Increasing/decreasing', type:'mc', stem:'If a battery-level function $B(t)$ has $B\'(t)<0$ on an interval, the battery level is:', options:['decreasing on that interval','increasing on that interval','constant on that interval','undefined on that interval'], answer:0,
+    explain:'A negative derivative means the output is falling as $t$ increases — by definition, the function is decreasing there.' },
+  { topic:'Absolute extrema on a closed interval', type:'numeric', stem:'For $f(x)=x^3-3x^2$ on $[0,3]$, the interior critical numbers solve $f\'(x)=3x^2-6x=0$. One is $x=0$; find the other.', answer:2, tol:0.1,
+    explain:'$3x^2-6x=3x(x-2)=0$ gives $x=0$ or $x=2$ — both interior critical numbers to check alongside the endpoints $x=0$ and $x=3$.' },
+  { topic:'Chain rule', type:'mc', stem:'Differentiate $y=(3x^2+1)^4$ using the Chain Rule. $\\dfrac{dy}{dx}=$', options:['$4(3x^2+1)^3\\cdot 6x$','$4(3x^2+1)^3$','$(3x^2+1)^3\\cdot 6x$','$4\\cdot 6x$'], answer:0,
+    explain:'Chain Rule: derivative of the outside function, $4(\\cdot)^3$, times the derivative of the inside function, $6x$: $4(3x^2+1)^3\\cdot 6x$.' },
+  { topic:'Product rule', type:'mc', stem:'Differentiate $f(x)=(x^2+3)(5x-2)$ using the Product Rule. $f\'(x)=$', options:['$2x(5x-2)+5(x^2+3)$','$2x\\cdot 5$','$(2x)(5)$','$5x-2+x^2+3$'], answer:0,
+    explain:'Product Rule: $f\'(x)=u\'v+uv\'$ with $u=x^2+3,\\,v=5x-2$: $2x(5x-2)+(x^2+3)(5)$.' },
+  { topic:'Domain of a function', type:'mc', stem:'Find the domain of $f(x)=\\sqrt{9x-27}$.', options:['$[3,\\infty)$','$(-\\infty,3]$','$[9,\\infty)$','all real numbers'], answer:0,
+    explain:'A square root needs a non-negative radicand: $9x-27\\ge 0\\Rightarrow x\\ge 3$, so the domain is $[3,\\infty)$.' },
+  { topic:'Domain of a function', type:'mc', stem:'Find the domain of $g(x)=\\dfrac{x-3}{x^2-25}$.', options:['all real numbers except $x=5$ and $x=-5$','all real numbers except $x=3$','all real numbers except $x=25$','all real numbers'], answer:0,
+    explain:'A rational function is undefined wherever the denominator is zero: $x^2-25=0\\Rightarrow x=\\pm5$, so those two values are excluded from the domain.' },
+  { topic:'Limits (factoring)', type:'numeric', stem:'Evaluate $\\displaystyle\\lim_{x\\to5}\\frac{x^2-25}{x-5}$.', answer:10, tol:0.1,
+    explain:'Factor first: $\\dfrac{x^2-25}{x-5}=\\dfrac{(x-5)(x+5)}{x-5}=x+5$ for $x\\ne5$. Then the limit as $x\\to5$ is $5+5=10$.' },
+  { topic:'Limits (rationalizing)', type:'numeric', stem:'Evaluate $\\displaystyle\\lim_{x\\to0}\\frac{\\sqrt{x+9}-3}{x}$.', answer:0.1667, tol:0.01,
+    explain:'Multiply by the conjugate: $\\dfrac{\\sqrt{x+9}-3}{x}\\cdot\\dfrac{\\sqrt{x+9}+3}{\\sqrt{x+9}+3}=\\dfrac{x}{x(\\sqrt{x+9}+3)}=\\dfrac{1}{\\sqrt{x+9}+3}$. As $x\\to0$, this gives $\\dfrac{1}{3+3}=\\dfrac{1}{6}\\approx0.167$.' },
+  { topic:'Limits (trig)', type:'numeric', stem:'Evaluate $\\displaystyle\\lim_{\\theta\\to0}\\frac{\\sin 3\\theta}{5\\theta}$.', answer:0.6, tol:0.02,
+    explain:'Rewrite as $\\dfrac{3}{5}\\cdot\\dfrac{\\sin3\\theta}{3\\theta}$. Since $\\displaystyle\\lim_{u\\to0}\\frac{\\sin u}{u}=1$, the limit is $\\dfrac{3}{5}\\cdot 1=0.6$.' },
+  { topic:'Continuity (removable)', type:'mc', stem:'For $f(x)=\\dfrac{x^2-49}{x-7}$, the discontinuity at $x=7$ is best classified as:', options:['removable — the limit exists but $f(7)$ is undefined','jump — the one-sided limits disagree','infinite — the function blows up there','there is no discontinuity'], answer:0,
+    explain:'$f(x)=x+7$ for $x\\ne7$, so $\\displaystyle\\lim_{x\\to7}f(x)=14$ exists, but $f(7)$ itself is undefined (division by zero) — a hole in the graph, i.e. a removable discontinuity.' },
+  { topic:'Continuity (infinite)', type:'mc', stem:'For $f(x)=\\dfrac{1}{x+4}$, the discontinuity at $x=-4$ is best classified as:', options:['infinite — the function has a vertical asymptote there','removable — just fill in a hole','jump — the one-sided limits disagree but are finite','there is no discontinuity'], answer:0,
+    explain:'As $x\\to-4$, the denominator $\\to0$ while the numerator stays $1$, so $f(x)\\to\\pm\\infty$ — an infinite discontinuity (vertical asymptote), not a fillable hole.' },
+  { topic:'Quotient rule', type:'mc', stem:'Differentiate $y=\\dfrac{t^3+2}{t^2-9}$ using the Quotient Rule. $y\'=$', options:['$\\dfrac{(3t^2)(t^2-9)-(t^3+2)(2t)}{(t^2-9)^2}$','$\\dfrac{3t^2}{2t}$','$\\dfrac{(3t^2)(2t)}{(t^2-9)^2}$','$3t^2-2t$'], answer:0,
+    explain:'Quotient Rule: $\\left(\\dfrac{u}{v}\\right)\'=\\dfrac{u\'v-uv\'}{v^2}$ with $u=t^3+2,\\,v=t^2-9$: $\\dfrac{(3t^2)(t^2-9)-(t^3+2)(2t)}{(t^2-9)^2}$.' },
+  { topic:'Quotient rule (interpretation)', type:'mc', stem:'An aircraft\'s glide ratio is $G(h)=\\dfrac{5h+600}{h+60}$ ($h$ = altitude, hundreds of ft). The Quotient Rule gives $G\'(h)=\\dfrac{-300}{(h+60)^2}$. This tells you the glide ratio is:', options:['always decreasing as altitude increases, since $G\'(h)<0$ for every $h$','always increasing, since the numerator is negative','constant, since $(h+60)^2$ is always positive','increasing for small $h$ and decreasing for large $h$'], answer:0,
+    explain:'The numerator $-300$ is negative and $(h+60)^2$ is always positive, so $G\'(h)<0$ everywhere in the domain — the glide ratio decreases steadily as altitude increases.' },
+  { topic:'Chain rule (exponential)', type:'numeric', stem:'For $f(t)=e^{-0.08t}$, find $f\'(0)$.', answer:-0.08, tol:0.01,
+    explain:'Chain Rule: $f\'(t)=-0.08\\,e^{-0.08t}$. At $t=0$: $f\'(0)=-0.08\\,e^{0}=-0.08$.' },
+  { topic:'Chain rule (composite rate)', type:'numeric', stem:'Air density is $\\rho(h)=1.225\\,e^{-0.14h}$ (kg/m³, $h$ in km), and an aircraft climbs so $h(t)=0.4t$ km ($t$ in minutes). Using the Chain Rule on $\\rho(h(t))$, find $\\dfrac{d\\rho}{dt}$ at $t=15$ min (i.e. $h=6$ km).', answer:-0.0296, tol:0.003,
+    explain:'$\\dfrac{d\\rho}{dh}=1.225(-0.14)e^{-0.14h}$ and $\\dfrac{dh}{dt}=0.4$. Chain Rule: $\\dfrac{d\\rho}{dt}=1.225(-0.14)(0.4)e^{-0.14(6)}\\approx-0.0686\\times e^{-0.84}\\approx-0.0686\\times0.432\\approx-0.0296$ kg/m³ per minute — density is dropping as the climb continues.' },
+  { topic:'Implicit differentiation', type:'numeric', stem:'For the circle $x^2+y^2=169$, use implicit differentiation to find $\\dfrac{dy}{dx}$ at the point $(5,12)$.', answer:-0.4167, tol:0.02,
+    explain:'Differentiating implicitly: $2x+2y\\,y\'=0\\Rightarrow y\'=-\\dfrac{x}{y}$. At $(5,12)$: $y\'=-\\dfrac{5}{12}\\approx-0.417$.' },
+  { topic:'Implicit differentiation', type:'mc', stem:'Use implicit differentiation on $e^{y}+x^2y=10$ to find $\\dfrac{dy}{dx}$.', options:['$\\dfrac{dy}{dx}=\\dfrac{-2xy}{e^{y}+x^2}$','$\\dfrac{dy}{dx}=\\dfrac{2xy}{e^{y}}$','$\\dfrac{dy}{dx}=-2xy$','$\\dfrac{dy}{dx}=\\dfrac{e^y}{x^2}$'], answer:0,
+    explain:'Differentiate both sides with respect to $x$: $e^{y}y\'+(2xy+x^2y\')=0$. Collect $y\'$ terms: $y\'(e^{y}+x^2)=-2xy$, so $y\'=\\dfrac{-2xy}{e^{y}+x^2}$.' },
+  { topic:'Curve sketching (inflection point)', type:'numeric', stem:'For $f(x)=x^3-6x^2$, find the $x$-coordinate of the inflection point by solving $f\'\'(x)=0$.', answer:2, tol:0.1,
+    explain:'$f\'(x)=3x^2-12x$, so $f\'\'(x)=6x-12$. Setting $f\'\'(x)=0$ gives $x=2$ — concavity switches there, from concave down to concave up.' },
+  { topic:'Motion (speeding up/slowing down)', type:'mc', stem:'A drone\'s altitude is $g(t)=-6t^2+54t$, with $v(t)=g\'(t)=-12t+54$ and $a(t)=v\'(t)=-12$. At $t=3$ s, $v(3)=18>0$ and $a(3)=-12<0$. Since velocity and acceleration have opposite signs, the drone is:', options:['slowing down','speeding up','holding a constant speed','momentarily stopped'], answer:0,
+    explain:'When velocity and acceleration point in opposite directions (one positive, one negative), the object is decelerating — even though it is still moving upward, it is slowing down.' },
+  { topic:'Absolute extrema on a closed interval', type:'numeric', stem:'For $f(x)=x^3-9x^2+7$ on $[0,7]$, the interior critical numbers solve $f\'(x)=3x^2-18x=0$. One is $x=0$; find the other.', answer:6, tol:0.1,
+    explain:'$3x^2-18x=3x(x-6)=0$ gives $x=0$ or $x=6$ — both must be checked against the endpoints $x=0$ and $x=7$ to find the absolute max/min.' },
+  { topic:'Second derivative test', type:'numeric', stem:'For $f(x)=x^3-3x^2-9x+5$, the critical numbers are $x=-1$ and $x=3$ (from $f\'(x)=3x^2-6x-9=0$). Using $f\'\'(x)=6x-6$, find the critical number that gives a local minimum.', answer:3, tol:0.1,
+    explain:'$f\'\'(3)=6(3)-6=12>0$ (concave up → local min); $f\'\'(-1)=6(-1)-6=-12<0$ (concave down → local max). So the local minimum is at $x=3$.' }
 ];
 add({ id:'practice-quiz-aviation', cat:'review', tag:'test yourself', title:'Practice & Test — Full Course Review', diff:'inter', ch:'All chapters review',
   questions:['Which topics — reading a climb graph, optimization, area-under-the-curve, or the atmosphere model — feel shakiest right now?','When a question trips you up, is it the aviation framing, or the underlying calculus rule?','Could you re-derive the formula behind a question, rather than just recalling a number?'],
-  blurb:'A short, auto-graded review pulling from every chapter — reading a climb-rate graph, derivatives, optimization (best glide & range), area-under-the-curve, and the atmosphere — drawn from a larger pool. Press Reset for a fresh set of questions.',
-  build: makeQuizBuild(QUIZ_POOL_AVIATION, 12)
+  blurb:'An auto-graded review pulling from every chapter — limits & continuity, derivative rules (product, quotient, chain, implicit), optimization & curve sketching, antiderivatives & indefinite integrals (with initial conditions), u-substitution, definite integrals, and the atmosphere model — drawn from a large question pool. Press Reset for a fresh set of questions.',
+  build: makeQuizBuild(QUIZ_POOL_AVIATION, 18)
 });
 
 /* --------------------- (4) CATALOG RENDERING ------------------------ */
