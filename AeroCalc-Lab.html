@@ -212,6 +212,24 @@ canvas{display:block;}
 .share-btn:hover{color:var(--ink);border-color:var(--ink-soft);}
 .share-btn.copied{color:var(--c-calc2);border-color:var(--c-calc2);}
 
+/* view counter pill (matches share-btn/darkToggle sizing, but not clickable) */
+.view-pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.72rem;font-weight:600;background:var(--paper-2);border:1px solid var(--line);border-radius:99px;padding:6px 13px;color:var(--ink-soft);}
+.view-pill svg{flex:none;}
+.view-pill.is-loading{opacity:.55;}
+
+/* comments CTA button in topbar — intentionally the loudest thing up there */
+.comments-nav-btn{display:inline-flex;align-items:center;gap:6px;font-family:var(--body);font-size:.82rem;font-weight:600;background:var(--c-calc1);color:#fff;border:none;border-radius:99px;padding:8px 15px;cursor:pointer;text-decoration:none;transition:.15s;}
+.comments-nav-btn:hover{transform:translateY(-1px);box-shadow:var(--shadow-md);}
+
+/* comments section */
+.comments-section{padding:10px 0 60px;}
+.comments-card{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-md);padding:26px 26px 20px;}
+.comments-head{display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap;}
+.comments-head h2{font-family:var(--display);font-weight:600;font-size:1.5rem;margin:0;letter-spacing:-.01em;}
+.comments-head .badge-soft{font-family:var(--mono);font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;color:var(--c-calc2);background:color-mix(in srgb, var(--c-calc2) 12%, transparent);border-radius:99px;padding:3px 10px;}
+.comments-sub{color:var(--ink-soft);font-size:.92rem;margin:0 0 18px;max-width:64ch;}
+#giscus-mount{min-height:80px;}
+
 .formula{font-family:var(--mono);font-size:.86rem;background:var(--paper-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 12px;color:var(--ink);overflow-x:auto;}
 
 @media(max-width:880px){
@@ -251,6 +269,12 @@ canvas{display:block;}
       AeroCalc Lab <span class="beta">v1</span>
     </button>
     <nav id="topnav"></nav>
+    <!-- Comments button temporarily disabled — see the big comment block near
+         loadGiscus() further down in this file for how to turn it back on. -->
+    <span class="view-pill is-loading" id="viewPill" title="Total page views"
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span id="viewCount">—</span>
+    </span>
     <button class="share-btn" id="darkToggle" onclick="toggleDark()" title="Toggle dark mode" aria-label="Toggle dark mode">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" id="darkIcon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
@@ -298,6 +322,22 @@ canvas{display:block;}
     <div id="searchEmpty">No tools match your search. Try a different keyword.</div>
   </div>
   <div class="wrap" id="catalog"></div>
+
+  <!-- Comments section temporarily disabled (style="display:none").
+       Delete that style attribute + the JS comment block near loadGiscus()
+       to bring it back once the giscus/GitHub Discussions setup is sorted. -->
+  <section class="comments-section" id="comments" style="display:none"
+    <div class="wrap">
+      <div class="comments-card">
+        <div class="comments-head">
+          <h2>💬 Questions &amp; discussion</h2>
+          <span class="badge-soft">Public</span>
+        </div>
+        <p class="comments-sub">Stuck on a tool, spot a bug, or want to compare notes with classmates? Leave a comment below — sign in with GitHub to post. Be kind and stay on topic; off-topic or inappropriate comments may be removed.</p>
+        <div id="giscus-mount"></div>
+      </div>
+    </div>
+  </section>
 
   <footer class="foot">
     <div class="wrap row">
@@ -2821,8 +2861,85 @@ function applyDark(d){
   COL.ink=d?'#EAF0F5':'#15233A'; COL.soft=d?'#A8B4C2':'#445268'; COL.faint=d?'#6B7888':'#82909F';
   if(viewEl.style.display==='block'){ const id=location.hash.slice(2); if(id)openApplet(decodeURIComponent(id)); }
   else heroAnim();
+  setGiscusTheme(d);
 }
 function toggleDark(){ _dark=!_dark; try{localStorage.setItem('cl-dark',_dark?'1':'0');}catch(e){} applyDark(_dark); }
+
+/* ---------- View counter (hitscounter.dev — free, no signup needed) ---------- */
+(function(){
+  const pageUrl = location.origin + location.pathname; // ignore #hash so all tools count toward one total
+  const api = 'https://hitscounter.dev/api/hit?url=' + encodeURIComponent(pageUrl) + '&json=true';
+  fetch(api).then(r=>r.json()).then(data=>{
+    const n = data.total_hits ?? data.totalHits ?? data.hits ?? data.count;
+    const el = document.getElementById('viewCount');
+    const pill = document.getElementById('viewPill');
+    if(n!=null && el){ el.textContent = Number(n).toLocaleString(); }
+    else if(el){ el.textContent = '—'; }
+    pill && pill.classList.remove('is-loading');
+  }).catch(()=>{
+    const pill = document.getElementById('viewPill');
+    if(pill) pill.style.display='none'; // fail quietly rather than show a broken counter
+  });
+})();
+
+/* ---------- Comments (giscus — GitHub Discussions-backed) ----------
+   SETUP REQUIRED (one-time, ~5 min):
+   1. On your GitHub repo: Settings → General → Features → check "Discussions".
+   2. Install the giscus app on the repo: https://github.com/apps/giscus → Install → pick this repo.
+   3. Go to https://giscus.app, enter your repo, choose a Discussion category
+      (e.g. create/select "Comments"), and it will generate a <script> snippet
+      with YOUR data-repo-id and data-category-id values.
+   4. Replace the FIVE "REPLACE_ME" placeholders below with the values giscus.app gives you.
+   Moderation: sign in to GitHub as the repo owner and you can hide/delete/lock any
+   comment or reply, either right inside the comment widget (an admin "..." menu appears
+   for you once you're recognized as a maintainer) or from the repo's Discussions tab.
+------------------------------------------------------------------- */
+function loadGiscus(){
+  const mount = document.getElementById('giscus-mount');
+  if(!mount || mount.dataset.loaded) return;
+  mount.dataset.loaded = '1';
+  const s = document.createElement('script');
+  s.src = 'https://giscus.app/client.js';
+  s.setAttribute('data-repo', 'REPLACE_ME/REPLACE_ME');           // e.g. "your-username/aerocalc-lab"
+  s.setAttribute('data-repo-id', 'REPLACE_ME');                    // from giscus.app
+  s.setAttribute('data-category', 'Comments');                     // your Discussion category name
+  s.setAttribute('data-category-id', 'REPLACE_ME');                // from giscus.app
+  s.setAttribute('data-mapping', 'pathname');
+  s.setAttribute('data-strict', '0');
+  s.setAttribute('data-reactions-enabled', '1');
+  s.setAttribute('data-emit-metadata', '0');
+  s.setAttribute('data-input-position', 'top');
+  s.setAttribute('data-theme', _dark ? 'dark' : 'light');
+  s.setAttribute('data-lang', 'en');
+  s.setAttribute('crossorigin', 'anonymous');
+  s.async = true;
+  mount.appendChild(s);
+}
+function setGiscusTheme(d){
+  const iframe = document.querySelector('iframe.giscus-frame');
+  if(!iframe) return;
+  iframe.contentWindow.postMessage({ giscus: { setConfig: { theme: d ? 'dark' : 'light' } } }, 'https://giscus.app');
+}
+// Comments are OFF for now — the auto-load-on-scroll wiring below is disabled
+// on purpose so nothing tries to reach out to giscus.app. To re-enable:
+//   1) remove the two `false &&` guards below
+//   2) remove style="display:none" on <section id="comments"> above
+//   3) remove the comments-button HTML comment in the header
+//   4) fill in the REPLACE_ME values in loadGiscus() above with your real
+//      giscus.app repo-id / category-id
+/*
+const commentsObserver = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{ if(e.isIntersecting){ loadGiscus(); commentsObserver.disconnect(); } });
+}, { rootMargin: '400px' });
+document.addEventListener('DOMContentLoaded', ()=>{
+  const target = document.getElementById('comments');
+  if(target) commentsObserver.observe(target);
+});
+if(document.readyState !== 'loading'){
+  const target = document.getElementById('comments');
+  if(target) commentsObserver.observe(target);
+}
+*/
 
 function shareApplet(){
   const btn=document.getElementById('shareBtn');
