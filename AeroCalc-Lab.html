@@ -2865,20 +2865,31 @@ function applyDark(d){
 }
 function toggleDark(){ _dark=!_dark; try{localStorage.setItem('cl-dark',_dark?'1':'0');}catch(e){} applyDark(_dark); }
 
-/* ---------- View counter (hitscounter.dev — free, no signup needed) ---------- */
+/* ---------- View counter (countapi.mileshilliard.com — free, no signup) ----------
+   Note: free "no signup" counters like this are convenient but can occasionally
+   go offline (the original countapi.xyz did, which is why we're on this one).
+   If the pill ever silently disappears again, that's this service being down —
+   the code fails quietly on purpose rather than showing a broken counter. The
+   most rock-solid (but signup-required) alternative is GoatCounter (goatcounter.com,
+   free, sign in with GitHub, one <script> tag) if you want something sturdier. */
 (function(){
-  const pageUrl = location.origin + location.pathname; // ignore #hash so all tools count toward one total
-  const api = 'https://hitscounter.dev/api/hit?url=' + encodeURIComponent(pageUrl) + '&json=true';
+  const key = 'aerocalc_' + location.hostname.replace(/[^a-z0-9]/gi,'_');
+  const api = 'https://countapi.mileshilliard.com/api/v1/hit/' + encodeURIComponent(key);
   fetch(api).then(r=>r.json()).then(data=>{
-    const n = data.total_hits ?? data.totalHits ?? data.hits ?? data.count;
+    const n = data.value;
     const el = document.getElementById('viewCount');
     const pill = document.getElementById('viewPill');
     if(n!=null && el){ el.textContent = Number(n).toLocaleString(); }
     else if(el){ el.textContent = '—'; }
     pill && pill.classList.remove('is-loading');
   }).catch(()=>{
+    // Show the eye icon with a dash instead of hiding it — this way if the
+    // counter service is briefly down, you'll SEE that (icon + "–") rather
+    // than the whole thing silently vanishing with no way to tell why.
+    const el = document.getElementById('viewCount');
     const pill = document.getElementById('viewPill');
-    if(pill) pill.style.display='none'; // fail quietly rather than show a broken counter
+    if(el) el.textContent = '–';
+    pill && pill.classList.remove('is-loading');
   });
 })();
 
