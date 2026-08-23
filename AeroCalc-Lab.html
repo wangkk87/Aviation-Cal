@@ -2865,18 +2865,11 @@ function applyDark(d){
 }
 function toggleDark(){ _dark=!_dark; try{localStorage.setItem('cl-dark',_dark?'1':'0');}catch(e){} applyDark(_dark); }
 
-/* ---------- View counter (countapi.mileshilliard.com — free, no signup) ----------
-   Note: free "no signup" counters like this are convenient but can occasionally
-   go offline (the original countapi.xyz did, which is why we're on this one).
-   If the pill ever silently disappears again, that's this service being down —
-   the code fails quietly on purpose rather than showing a broken counter. The
-   most rock-solid (but signup-required) alternative is GoatCounter (goatcounter.com,
-   free, sign in with GitHub, one <script> tag) if you want something sturdier. */
+/* ---------- View counter (self-hosted Cloudflare Worker + KV) ---------- */
 (function(){
-  const key = 'aerocalc_' + location.hostname.replace(/[^a-z0-9]/gi,'_');
-  const api = 'https://countapi.mileshilliard.com/api/v1/hit/' + encodeURIComponent(key);
+  const api = 'https://cal-lab-counter.wangkk87.workers.dev/?site=aerocalc';
   fetch(api).then(r=>r.json()).then(data=>{
-    const n = data.value;
+    const n = data.count;
     const el = document.getElementById('viewCount');
     const pill = document.getElementById('viewPill');
     if(n!=null && el){ el.textContent = Number(n).toLocaleString(); }
