@@ -2134,33 +2134,68 @@ add({ id:'limit-explorer', cat:'calc1', tag:'type a function', title:'Limit Expl
   build(host){
     const fin=makeFnInput('Function f(x)','sin(x)/x',['x'],()=>render(),'try: (x^2-1)/(x-1),  1/x,  sin(x)/x');
     const aIn=UI.number({label:'Approach x →',value:0,step:'any',onchange:render});
-    const plot=UI.plotCard('Zooming in on x = a',300);
-    const tbl=document.createElement('div'); tbl.className='formula'; tbl.style.lineHeight='1.9';
-    host.appendChild(UI.appGrid([fin,aIn,UI.note('The table shows f(x) as x creeps toward your point from each side. If both columns head to the <b>same</b> number, that number is the <b>limit</b> — even if f(a) itself is undefined.'),tbl],[plot]));
+    const plot=UI.plotCard('Zooming in on x = a',420);
+    const tbl=document.createElement('div'); tbl.className='formula'; tbl.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;line-height:1.75;font-size:.82rem;';
+    const concl=UI.statsBox();
+    host.appendChild(UI.appGrid([fin,aIn,UI.note('The table shows f(x) as x creeps toward your point from each side. If both columns head to the <b>same</b> number, that number is the <b>limit</b> — even when f(a) is undefined (a <b>hollow dot</b>) or sits somewhere else (a removable hole). Drag/scroll the plot to zoom.')],[plot,tbl,concl]));
     plot.enableZoom(render);
-    function sideLimit(f,a,dir){ let v=NaN; for(const o of [1e-1,1e-2,1e-3,1e-4,1e-5,1e-6]){ const y=f(a+dir*o); if(isFinite(y))v=y; } return v; }
+    // walks x toward a from one side; returns a finite limit, or +/-Infinity if the
+    // values keep blowing up (e.g. 1/x^2 at x=0) instead of settling on a number
+    function sideLimit(f,a,dir){
+      const samples=[1e-1,1e-2,1e-3,1e-4,1e-5,1e-6].map(o=>f(a+dir*o)).filter(isFinite);
+      if(!samples.length) return NaN;
+      const last=samples[samples.length-1];
+      const prev=samples.length>1?samples[samples.length-2]:null;
+      // blowing up: the last sample is large AND still growing relative to the previous one
+      if(Math.abs(last)>1e4 && (prev===null || Math.abs(last)>Math.abs(prev)*3)) return last>0?Infinity:-Infinity;
+      return last;
+    }
     function render(){
       const f=fin.fn(); if(!f)return; const a=aIn.get();
       const offs=[1,0.5,0.1,0.01,0.001];
       const left=offs.map(o=>({x:a-o,y:f(a-o)})), right=offs.slice().reverse().map(o=>({x:a+o,y:f(a+o)}));
-      let rows='<b>from the left →</b><br>';
-      left.forEach(p=>{ rows+='x = '+M.round(p.x,4)+' → f = '+(isFinite(p.y)?M.round(p.y,5):'undefined')+'<br>'; });
-      rows+='<br><b>← from the right</b><br>';
-      right.forEach(p=>{ rows+='x = '+M.round(p.x,4)+' → f = '+(isFinite(p.y)?M.round(p.y,5):'undefined')+'<br>'; });
-      const fa=f(a); const Lm=sideLimit(f,a,-1), Lp=sideLimit(f,a,1);
-      const exists=isFinite(Lm)&&isFinite(Lp)&&Math.abs(Lp-Lm)<1e-3; const L=(Lp+Lm)/2;
-      rows+='<br>left ≈ '+(isFinite(Lm)?M.round(Lm,5):'—')+',  right ≈ '+(isFinite(Lp)?M.round(Lp,5):'—');
-      rows+='<br>f('+M.round(a,3)+') = '+(isFinite(fa)?M.round(fa,5):'<span style="color:'+COL.coral+'">undefined</span>');
-      if(exists){ rows+='<br><b style="color:'+COL.calc1+'">limit = '+M.round(L,5)+'</b>'; if(!isFinite(fa)||Math.abs(fa-L)>1e-3) rows+=' <span style="color:'+COL.amber+'">(hole: f(a) ≠ limit)</span>'; }
-      else rows+='<br><b style="color:'+COL.coral+'">left ≠ right → no limit</b>';
+      let rows=`<div style="font-weight:600;color:${COL.calc2}">x → a⁻ (from left)</div><div style="font-weight:600;color:${COL.calc3}">x → a⁺ (from right)</div>`;
+      for(let i=0;i<left.length;i++){
+        rows+=`<div>x=${M.round(left[i].x,4)} → f(x)=${isFinite(left[i].y)?M.round(left[i].y,5):'undefined'}</div>`;
+        rows+=`<div>x=${M.round(right[i].x,4)} → f(x)=${isFinite(right[i].y)?M.round(right[i].y,5):'undefined'}</div>`;
+      }
       tbl.innerHTML=rows;
+      const fa=f(a); const Lm=sideLimit(f,a,-1), Lp=sideLimit(f,a,1);
+      const fmtSide=v=>isFinite(v)?M.round(v,5):(v===Infinity?'+∞':v===-Infinity?'−∞':'—');
+      const exists=isFinite(Lm)&&isFinite(Lp)&&Math.abs(Lp-Lm)<1e-3; const L=(Lp+Lm)/2;
+      const sameInfinity=(Lm===Infinity&&Lp===Infinity)||(Lm===-Infinity&&Lp===-Infinity);
+      const conclData=[
+        {k:'left limit L⁻ (x→a⁻)', v: fmtSide(Lm)},
+        {k:'right limit L⁺ (x→a⁺)', v: fmtSide(Lp)},
+        {k:`f(${M.round(a,3)})`, v: isFinite(fa)?M.round(fa,5):`<span style="color:${COL.coral}">undefined</span>`}
+      ];
+      if(exists){
+        let lv=`<span style="color:${COL.calc1}">${M.round(L,5)}</span>`;
+        if(!isFinite(fa)||Math.abs(fa-L)>1e-3) lv+=`<div style="font-size:.68rem;font-weight:500;color:${COL.amber};margin-top:2px;">removable hole — f(a) ≠ limit</div>`;
+        conclData.push({k:'limit', v:lv, accent:1});
+      } else if(sameInfinity){
+        conclData.push({k:'limit', v:`<span style="color:${COL.coral}">${Lm>0?'+∞':'−∞'}</span><div style="font-size:.68rem;font-weight:500;color:${COL.soft};margin-top:2px;">diverges — vertical asymptote at x=${M.round(a,3)}</div>`, accent:1});
+      } else {
+        const detail=(!isFinite(Lm)||!isFinite(Lp))?'unbounded near a':'left ≠ right';
+        conclData.push({k:'limit', v:`<span style="color:${COL.coral}">does not exist</span><div style="font-size:.68rem;font-weight:500;color:${COL.soft};margin-top:2px;">${detail}</div>`, accent:1});
+      }
+      concl.set(conclData);
       const span=2; const ch=plot.chart(); ch.setX(a-span,a+span);
       const ys=[]; for(let i=0;i<=80;i++){ const x=a-span+2*span*i/80; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e4)ys.push(y); }
       let ylo=ys.length?M.min(ys):-2, yhi=ys.length?M.max(ys):2; if(exists){ylo=Math.min(ylo,L);yhi=Math.max(yhi,L);} const pad=(yhi-ylo)*0.15||1;
       ch.setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,5),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
       ch.axisX(niceTicks(ch.xmin,ch.xmax,5)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
       ch.curve(f,COL.calc1,2.4); ch.vline(a,hexA(COL.coral,.6),1.5,[4,3]);
-      if(exists){ const ctx=ch.ctx; ctx.beginPath(); ctx.arc(ch.X(a),ch.Y(L),5,0,M.TAU); ctx.fillStyle=COL.paper; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=COL.coral; ctx.stroke(); }
+      const ctx=ch.ctx;
+      if(exists){
+        if(!isFinite(fa)||Math.abs(fa-L)>1e-3){ // open circle at the limit (a hole)
+          ctx.beginPath(); ctx.arc(ch.X(a),ch.Y(L),5,0,M.TAU); ctx.fillStyle=COL.paper; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=COL.coral; ctx.stroke();
+          if(isFinite(fa)) ch.dot(a,fa,COL.calc1,5); // the actual (filled) value sits elsewhere
+        } else ch.dot(a,L,COL.coral,5);
+      } else { // one-sided: mark each approach value
+        if(isFinite(Lm)){ ctx.beginPath(); ctx.arc(ch.X(a),ch.Y(Lm),5,0,M.TAU); ctx.fillStyle=COL.paper; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=COL.calc2; ctx.stroke(); }
+        if(isFinite(Lp)){ ctx.beginPath(); ctx.arc(ch.X(a),ch.Y(Lp),5,0,M.TAU); ctx.fillStyle=COL.paper; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=COL.calc3; ctx.stroke(); }
+      }
     }
     render();
   }
